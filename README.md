@@ -1,5 +1,5 @@
-Diablo II Macros
-================
+Diablo II AutoHotkey Macro Library
+==================================
 
 Diablo II is a great game, but some of its controls provide an opportunity for a more efficient setup. This project contains [AutoHotkey][ahk] macros for Diablo II.
 
