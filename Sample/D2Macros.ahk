@@ -10,9 +10,15 @@ Diablo2_Init("Keys.json", "SkillWeaponSets.json")
 
 #IfWinActive ahk_class Diablo II
 
-/::Diablo2_SetKeyBindings()
+; Ctrl+Alt+a to assign key bindings.
+^!a::Diablo2_SetKeyBindings()
 
 #IfWinActive
 
-F11::Suspend
-F12::ExitApp
+; Don't use a key used for Diablo II, as the hotkey for suspend won't be suspended when running 
+; 'Suspend On'. Ideally use, a hotkey that won't be used in any applications globally.
+
+; Ctrl+Alt+s to suspend.
+^!s::Suspend
+; Ctrl+Alt+x to exit.
+^!x::ExitApp
