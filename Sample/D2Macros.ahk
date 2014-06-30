@@ -16,7 +16,7 @@ Diablo2_Init("Keys.json", "SkillWeaponSets.json")
 #IfWinActive
 
 ; Don't use a key used for Diablo II, as the hotkey for suspend won't be suspended when running 
-; 'Suspend On'. Ideally use, a hotkey that won't be used in any applications globally.
+; 'Suspend On'. Ideally, use a hotkey that won't be used in any applications globally.
 
 ; Ctrl+Alt+s to suspend.
 ^!s::Suspend
