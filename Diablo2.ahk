@@ -68,21 +68,6 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 	}
 }
 
-/* TODO: Currently unused.
- * Convert a key in Send syntax to Hotkey syntax.
- * Unfortunately, these commands don't use the same syntax. While Send uses keys surrouned by curly
- * braces (e.g., {F1}), Hotkey doesn't (e.g., F1). However, we have specify the keys in Send syntax
- * so that we know that they *do* need braces for Send. This command strips the braces.
- */
-Diablo2_SendKeySyntaxToHotkeySyntax(SendKeyString) {
-	;                           Study the regex to improve speed on subsequent runs.
-	; Store a match object. --\ |
-	;                          VV
-	RegExMatch(SendKeyString, "OS)^\{(.*)\}$", MatchObject)
-	KeyNoBraces := MatchObject.Value(1)
-	return KeyNoBraces
-}
-
 /* Conver a key in Hotkey syntax to Send syntax.
  * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
  * this doesn't account for every possible case, but it seems to work.
