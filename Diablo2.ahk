@@ -7,40 +7,30 @@ SendMode Input  ; Recommended for new scripts due to its superior speed and reli
 
 #Include <JSON>
 
-/* Parse a JSON file, checking for existence first.
- */
-Diablo2_SafeParseJSONFile(FilePath) {
-	try {
-		; FileRead is supposed to throw if placed inside a try block, but it doesn't seem to do so.
-		; We will just throw our own helpful error.
-		FileRead, FileContents, %FilePath%
-	}
-	catch, e {
-		throw, Exception("Error reading file: " FilePath)
-	}
-	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the 
-	; order they were declared.
-	; This is important for the key bindings, where the order does matter.
-	return JSON.parse(FileContents, true)
-}	
+/**************************************************************************************************
+ * BEGIN PUBLIC FUNCTIONS
+ *************************************************************************************************/
 
-/* Initialize macros. Call this before calling any other Diablo2 functions!
+/**
+ * Initialize macros. Call this before calling any other Diablo2 functions!
  *
+ * Arguments:
  * KeysConfigFilePath
  *     A path to a JSON config file containing key mappings.
- *
  * SkillWeaponSetConfigFilePath
  *     A path to a JSON config file containing weapon set preferences for each skill. 
  *     Pass this as "" to disable skill/weapon set association.
+ *
+ * Return value: None
  */
 Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 	Global Diablo2 :=  {NumSkills: 16, WindowClass: "Diablo II"}
 	; Configuration
-	Diablo2.KeysConfig := Diablo2_SafeParseJSONFile(KeysConfigFilePath)
+	Diablo2.KeysConfig := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
 	
 	if (SkillWeaponSetConfigFilePath != "") {
 		; Read the config file
-		Diablo2.SkillWeaponSetConfig := Diablo2_SafeParseJSONFile(SkillWeaponSetConfigFilePath)
+		Diablo2.SkillWeaponSetConfig := Diablo2_Private_SafeParseJSONFile(SkillWeaponSetConfigFilePath)
 		Diablo2.SkillKeyToWeaponSetMapping := {}
 		Diablo2.SwapWeaponsKey := Diablo2.KeysConfig["Swap Weapons"]
 	
@@ -68,33 +58,11 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 	}
 }
 
-/* Conver a key in Hotkey syntax to Send syntax.
- * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
- * this doesn't account for every possible case, but it seems to work.
- */
-Diablo2_HotkeySyntaxToSendKeySyntax(HotkeyString) {
-	if (StrLen(HotkeyString) > 1) {
-		return "{" HotkeyString "}"
-	}
-	return HotkeyString
-}
-
-/* Assign a single key binding in the "Configure Controls" screen.
- * Advance to the next control afterward.
- */
-Diablo2_AssignKeyAndAdvance(KeyString) {
-	Global Diablo2
-	if (KeyString == "") {
-		Send, {Delete}
-	}
-	else {
-		Send, % "{Enter}" Diablo2_HotkeySyntaxToSendKeySyntax(KeyString)
-	}
-	Send, {Down}
-}
-
-/* Set key bindings for the game. 
- * Assign to a hotkey, visit "Configure Controls" screen, and press the hotkey.
+/**
+ * Set key bindings for the game.
+ * To use, assign to a hotkey, visit "Configure Controls" screen, and press the hotkey.
+ *
+ * Return value: None
  */
 Diablo2_SetKeyBindings() {
 	Global Diablo2
@@ -106,11 +74,11 @@ Diablo2_SetKeyBindings() {
 		if (KeyFunction == "Skills" or KeyFunction == "Belt") {
 			; Each of these names contain a list of keys.
 			for ListIndex, ListElement in Value {
-				Diablo2_AssignKeyAndAdvance(ListElement)
+				Diablo2_Private_AssignKeyAndAdvance(ListElement)
 			}
 		}
 		else {
-			Diablo2_AssignKeyAndAdvance(Value)
+			Diablo2_Private_AssignKeyAndAdvance(Value)
 		}
 	}
 	
@@ -118,9 +86,83 @@ Diablo2_SetKeyBindings() {
 	Suspend Off
 }
 
-/* Activate the skill indicated by the hotkey pressed.
+/**************************************************************************************************
+ * BEGIN PRIVATE FUNCTIONS
+ *************************************************************************************************/
+
+/**
+ * Parse a JSON file, checking for existence first.
+ * 
+ * Arguments:
+ * FilePath
+ *     Path to file containing JSON format.
+ *
+ * Return value: The top-level object parsed from the JSON file.
  */
-Diablo2_ActivateSkill(SkillKey) {
+Diablo2_Private_SafeParseJSONFile(FilePath) {
+	try {
+		; FileRead is supposed to throw if placed inside a try block, but it doesn't seem to do so.
+		; We will just throw our own helpful error.
+		FileRead, FileContents, %FilePath%
+	}
+	catch, e {
+		throw, Exception("Error reading file: " FilePath)
+	}
+	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the 
+	; order they were declared.
+	; This is important for the key bindings, where the order does matter.
+	return JSON.parse(FileContents, true)
+}	
+
+/**
+ * Convert a key in Hotkey syntax to Send syntax.
+ * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
+ * this doesn't account for every possible case, but it seems to work.
+ *
+ * Arguments:
+ * HotkeyString
+ *     A key string in Hotkey syntax, i.e., with unescaped special keys (e.g. F1 instead of {F1}).
+ *
+ * Return value: The key in Send syntax.
+ */
+Diablo2_Private_HotkeySyntaxToSendKeySyntax(HotkeyString) {
+	if (StrLen(HotkeyString) > 1) {
+		return "{" HotkeyString "}"
+	}
+	return HotkeyString
+}
+
+/**
+ * Assign a single key binding in the "Configure Controls" screen, advancing to the next control
+ * afterward.
+ *
+ * Arguments:
+ * KeyString
+ *     The key to assign to the current control, in Hotkey syntax.
+ *
+ * Return value: None
+ */
+Diablo2_Private_AssignKeyAndAdvance(KeyString) {
+	Global Diablo2
+	if (KeyString == "") {
+		Send, {Delete}
+	}
+	else {
+		Send, % "{Enter}" Diablo2_Private_HotkeySyntaxToSendKeySyntax(KeyString)
+	}
+	Send, {Down}
+}
+
+/**
+ * Activate the skill indicated by the hotkey pressed.
+ *
+ * Arguments:
+ * SkillKey
+ *     The pressed skill hotkey.
+ *
+ * Return value: None
+ */
+Diablo2_Private_ActivateSkill(SkillKey) {
 	Global Diablo2
 	PreferredWeaponSet := Diablo2.SkillKeyToWeaponSetMapping[SkillKey]
 	SwitchWeaponSet := (PreferredWeaponSet != ""
@@ -144,7 +186,7 @@ Diablo2_ActivateSkill(SkillKey) {
 			Sleep, 70
 		}
 
-		Send, % Diablo2_HotkeySyntaxToSendKeySyntax(SkillKey)
+		Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(SkillKey)
 		
 		Diablo2.CurrentSkills[Diablo2.CurrentWeaponSet] := SkillKey
 	}
@@ -157,7 +199,7 @@ goto, End
 
 ; Handle all skill hotkeys with a preferred weapon set.
 SkillHotkeyActivated:
-Diablo2_ActivateSkill(A_ThisHotkey)
+Diablo2_Private_ActivateSkill(A_ThisHotkey)
 return
 
 End:
