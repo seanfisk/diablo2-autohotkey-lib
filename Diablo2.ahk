@@ -1,4 +1,4 @@
-﻿#NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
+#NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
 #Warn  ; Enable warnings to assist with detecting common errors.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 
@@ -18,7 +18,7 @@ SendMode Input  ; Recommended for new scripts due to its superior speed and reli
  * KeysConfigFilePath
  *     A path to a JSON config file containing key mappings.
  * SkillWeaponSetConfigFilePath
- *     A path to a JSON config file containing weapon set preferences for each skill. 
+ *     A path to a JSON config file containing weapon set preferences for each skill.
  *     Pass this as "" to disable skill/weapon set association.
  *
  * Return value: None
@@ -27,18 +27,18 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 	Global Diablo2 :=  {NumSkills: 16, WindowClass: "Diablo II"}
 	; Configuration
 	Diablo2.KeysConfig := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
-	
+
 	if (SkillWeaponSetConfigFilePath != "") {
 		; Read the config file
 		Diablo2.SkillWeaponSetConfig := Diablo2_Private_SafeParseJSONFile(SkillWeaponSetConfigFilePath)
 		Diablo2.SkillKeyToWeaponSetMapping := {}
 		Diablo2.SwapWeaponsKey := Diablo2.KeysConfig["Swap Weapons"]
-	
+
 		; Set up the skill mappings
-		
+
 		; Make hotkeys created in the loop only active in the "Diablo II" window.
 		Hotkey, IfWinActive, % "ahk_class" Diablo2.WindowClass
-		
+
 		Loop, % Diablo2.NumSkills {
 			SkillKey := Diablo2.KeysConfig.Skills[A_Index]
 			SkillWeaponSet := Diablo2.SkillWeaponSetConfig[A_Index]
@@ -48,10 +48,10 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 				Hotkey, %SkillKey%, SkillHotkeyActivated
 			}
 		}
-		
+
 		; Turn off context-sensitive hotkey creation.
 		Hotkey, IfWinActive
-				
+
 		; Macro state
 		Diablo2.CurrentWeaponSet := 1
 		Diablo2.CurrentSkills := ["", ""]
@@ -68,7 +68,7 @@ Diablo2_SetKeyBindings() {
 	Global Diablo2
 	; Suspend all hotkeys while assigning key bindings.
 	Suspend On
-	
+
 	for KeyFunction, Value in Diablo2.KeysConfig
 	{
 		if (KeyFunction == "Skills" or KeyFunction == "Belt") {
@@ -81,7 +81,7 @@ Diablo2_SetKeyBindings() {
 			Diablo2_Private_AssignKeyAndAdvance(Value)
 		}
 	}
-	
+
 	; Turn hotkeys back on.
 	Suspend Off
 }
@@ -92,7 +92,7 @@ Diablo2_SetKeyBindings() {
 
 /**
  * Parse a JSON file, checking for existence first.
- * 
+ *
  * Arguments:
  * FilePath
  *     Path to file containing JSON format.
@@ -108,11 +108,11 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
 	catch, e {
 		throw, Exception("Error reading file: " FilePath)
 	}
-	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the 
+	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the
 	; order they were declared.
 	; This is important for the key bindings, where the order does matter.
 	return JSON.parse(FileContents, true)
-}	
+}
 
 /**
  * Convert a key in Hotkey syntax to Send syntax.
@@ -167,7 +167,7 @@ Diablo2_Private_ActivateSkill(SkillKey) {
 	PreferredWeaponSet := Diablo2.SkillKeyToWeaponSetMapping[SkillKey]
 	SwitchWeaponSet := (PreferredWeaponSet != ""
 		and PreferredWeaponSet != Diablo2.CurrentWeaponSet)
-	
+
 	; Suspend all hotkeys while this stuff is happening.
 	; This decreases the chance of the game and macros getting out-of-sync.
 	Suspend, On
@@ -178,7 +178,7 @@ Diablo2_Private_ActivateSkill(SkillKey) {
 		Send, % Diablo2.SwapWeaponsKey
 		Diablo2.CurrentWeaponSet := PreferredWeaponSet
 	}
-	
+
 	if (Diablo2.CurrentSkills[Diablo2.CurrentWeaponSet] != SkillKey) {
 		if (SwitchWeaponSet) {
 			; If we just switched weapons, we need to sleep very slightly
@@ -187,10 +187,10 @@ Diablo2_Private_ActivateSkill(SkillKey) {
 		}
 
 		Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(SkillKey)
-		
+
 		Diablo2.CurrentSkills[Diablo2.CurrentWeaponSet] := SkillKey
 	}
-	
+
 	; Turn on hotkeys.
 	Suspend, Off
 }

@@ -1,0 +1,20 @@
+# EditorConfig is awesome: http://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+[*]
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.ahk]
+indent_style = tab
+indent_size = 2
+# See http://ahkscript.org/docs/Scripts.htm#cp
+# Default encoding is ANSI
+# charset is not supported by Emacs plugin
+# charset = utf-8-bom
+
+[*.json]
+indent_style = tab
+indent_size = 2
