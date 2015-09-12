@@ -111,7 +111,7 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
 	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the
 	; order they were declared.
 	; This is important for the key bindings, where the order does matter.
-	return JSON.parse(FileContents, true)
+	return JSON.Load(FileContents, true)
 }
 
 /**

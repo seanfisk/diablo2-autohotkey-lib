@@ -1,0 +1,3 @@
+[submodule "Vendor/JSON"]
+	path = Vendor/JSON
+	url = https://github.com/cocobelgica/AutoHotkey-JSON.git
