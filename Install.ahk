@@ -15,5 +15,6 @@ FileCopy, Vendor\JSON\JSON.ahk, %AutoHotkeyLibDir%, true
 ; Compile after installing, as Diablo2Run.ahk makes use of Diablo2.ahk.
 RunWait, %Ahk2ExePath% /in Diablo2Run.ahk /out %AutoHotkeyLibDir%\Diablo2Run.exe /icon D2.ico
 ; Passing 1 overwrites existing files.
+FileCopyDir, Images, %AutoHotkeyLibDir%\Images, 1
 
 MsgBox, Install successful!`n`nInstalled to %AutoHotkeyLibDir%.
