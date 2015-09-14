@@ -125,8 +125,6 @@ Diablo2_SetKeyBindings() {
  */
 Diablo2_FillPotion(Prefer := "Lesser") {
 	global Diablo2
-	; Save mouse position.
-	MouseGetPos, OldMouseX, OldMouseY
 	; Open inventory and ready for insertion into potion belt.
 	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Inventory Screen"]) "{Shift down}"
 	; Fill potions of each type.
@@ -137,8 +135,6 @@ Diablo2_FillPotion(Prefer := "Lesser") {
 
 	; End insertion and clear screen
 	Send, % "{Shift up}" Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Clear Screen"])
-	; Move the mouse back.
-	MouseMove, OldMouseX, OldMouseY
 }
 
 /**************************************************************************************************
@@ -272,9 +268,6 @@ Diablo2_Private_FillPotionType(Type_, Sizes, Prefer) {
 	}
 
 	LastPotion := {X: -1, Y: -1}
-	; Get the mouse out of the way; it can interfere with the ImageSearch. This position is just above the inventory.
-	NonInterferenceCoords := {X: 550, Y: 310}
-	MouseMove, % NonInterferenceCoords.X, % NonInterferenceCoords.Y
 	SizeLoop:
 	For _, Size in Sizes {
 		ImagePath := Format("{1}\{2}\{3}.png", Diablo2.ImagesDir, Type_, Size)
@@ -292,8 +285,13 @@ Diablo2_Private_FillPotionType(Type_, Sizes, Prefer) {
 			}
 			; The sleeps here are totally emperical. Just seems to work best this way.
 			Sleep, 100
+			MouseGetPos, MouseX, MouseY
+			LButtonIsDown := GetKeyState("LButton")
 			Click, %PotionX%, %PotionY%
-			MouseMove, % NonInterferenceCoords.X, % NonInterferenceCoords.Y
+			MouseMove, MouseX, MouseY
+			if (LButtonIsDown) {
+				Send, {LButton down}
+			}
 			Sleep, 100
 			LastPotion := {X: PotionX, Y: PotionY}
 		}
