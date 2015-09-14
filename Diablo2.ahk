@@ -9,10 +9,11 @@ SendMode Input  ; Recommended for new scripts due to its superior speed and reli
 
 /**************************************************************************************************
  * BEGIN PUBLIC FUNCTIONS
- *************************************************************************************************/
+ */
 
 /**
- * Initialize macros. Call this before calling any other Diablo2 functions!
+ * Initialize macros by reading the configuration files and setting up hotkeys. Call this before 
+ * calling any other Diablo2 functions!
  *
  * Arguments:
  * KeysConfigFilePath
@@ -24,7 +25,7 @@ SendMode Input  ; Recommended for new scripts due to its superior speed and reli
  * Return value: None
  */
 Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
-	Global Diablo2 :=  {NumSkills: 16, WindowClass: "Diablo II"}
+	Global Diablo2 := {NumSkills: 16, HotkeyCondition: "ahk_classDiablo II"}
 	; Configuration
 	Diablo2.KeysConfig := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
 
@@ -35,9 +36,7 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 		Diablo2.SwapWeaponsKey := Diablo2.KeysConfig["Swap Weapons"]
 
 		; Set up the skill mappings
-
-		; Make hotkeys created in the loop only active in the "Diablo II" window.
-		Hotkey, IfWinActive, % "ahk_class" Diablo2.WindowClass
+		Hotkey, IfWinActive, % Diablo2.HotkeyCondition
 
 		Loop, % Diablo2.NumSkills {
 			SkillKey := Diablo2.KeysConfig.Skills[A_Index]
@@ -56,6 +55,28 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 		Diablo2.CurrentWeaponSet := 1
 		Diablo2.CurrentSkills := ["", ""]
 	}
+}
+
+/**
+ * Run the game. There are command-line parameters stored in the registry, but the game seems not
+ * to use them. This function reads them and starts the game with them. Typically this contains
+ * just -skiptobnet, which starts the game right at the Battle.Net login screen. Calling this in 
+ * your personal macro file is optional.
+ *
+ * Return value: None
+ */
+Diablo2_StartGame() {
+	Global Diablo2
+	for _, Var in ["GamePath", "CmdLine"] {
+		; CmdLine typically contains -skiptobnet, which is what we want. But this allows the user 
+		; to change it through the registry as well.
+		RegRead, %Var%, HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II, %Var%
+	}
+	SplitPath, GamePath, , GameDir
+	Run, %GamePath% %CmdLine%, %GameDir%
+	; We considered saving the PID from this and using ahk_pid to limit hotkeys to that, but it's
+	; adding unnecessary complexity. There can be only one Diablo II instance running at a time
+	; anyway.
 }
 
 /**
@@ -88,7 +109,7 @@ Diablo2_SetKeyBindings() {
 
 /**************************************************************************************************
  * BEGIN PRIVATE FUNCTIONS
- *************************************************************************************************/
+ */
 
 /**
  * Parse a JSON file, checking for existence first.
