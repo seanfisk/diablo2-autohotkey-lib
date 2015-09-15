@@ -10,11 +10,21 @@ RegRead, GamePath, HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II, 
 
 FileCreateDir, %AutoHotkeyLibDir%
 
-FileCopy, Diablo2.ahk, %AutoHotkeyLibDir%, true
-FileCopy, Vendor\JSON\JSON.ahk, %AutoHotkeyLibDir%, true
+InstallFile(SourcePath) {
+	Global AutoHotkeyLibDir
+	FileCopy, %SourcePath%, %AutoHotkeyLibDir%, true
+}
+
+InstallFile("Diablo2.ahk")
+InstallFile("Vendor\JSON\JSON.ahk")
+InstallFile("Vendor\WatchDirectory\WatchDirectory.ahk")
+For _, BaseName in ["_Struct", "sizeof"] {
+	InstallFile(Format("Vendor\_Struct\{}.ahk", BaseName))
+}
+InstallFile("Vendor\Gdip\Gdip.ahk")
+InstallFile("Vendor\MasterFocus\Functions\Gdip_ImageSearch\Gdip_ImageSearch.ahk")
+FileCopyDir, Images, %AutoHotkeyLibDir%\Images, true
 ; Compile after installing, as Diablo2Run.ahk makes use of Diablo2.ahk.
 RunWait, %Ahk2ExePath% /in Diablo2Run.ahk /out %AutoHotkeyLibDir%\Diablo2Run.exe /icon D2.ico
-; Passing 1 overwrites existing files.
-FileCopyDir, Images, %AutoHotkeyLibDir%\Images, 1
 
 MsgBox, Install successful!`n`nInstalled to %AutoHotkeyLibDir%.

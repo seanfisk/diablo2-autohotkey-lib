@@ -1,5 +1,5 @@
 #NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
-#Warn  ; Enable warnings to assist with detecting common errors.
+; Don't warn; libraries we include have too many errors :|
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 ; IMPORTANT: Needed in windowed mode to find the correct coordinates.
 CoordMode, Pixel, Client
@@ -9,6 +9,13 @@ CoordMode, Mouse, Client
 ; See <http://ahkscript.org/docs/KeyList.htm>
 
 #Include <JSON>
+; Include these here, otherwise it will try to include at the end and mess up because of our labels.
+; It's hacky, but it seems to work.
+#Include <Gdip>
+#Include <sizeof>
+#Include <_Struct>
+#Include <WatchDirectory>
+#Include <Gdip_ImageSearch>
 
 /**************************************************************************************************
  * BEGIN PUBLIC FUNCTIONS
@@ -24,14 +31,20 @@ CoordMode, Mouse, Client
  * SkillWeaponSetConfigFilePath
  *     A path to a JSON config file containing weapon set preferences for each skill.
  *     Pass this as "" to disable skill/weapon set association.
+ * Fullscreen
+ *     Pass this as true to indicate you are playing in fullscreen mode. Pass as false to indicate
+ *     windowed mode. This is used to determine which technique by which to retrieve the contents
+ *     of the screen for filling potions.
  *
  * Return value: None
  */
-Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
-	; From the inventory image, the Y coordinates are 314, 435. But I think in windowed mode, it's counting the title bar in the coordinates.
-	Global Diablo2 := {NumSkills: 16, HotkeyCondition: "ahk_classDiablo II", InventoryCoords: {TopLeft: {X: 418, Y: 342}, BottomRight: {X: 710, Y: 462}}, ImagesDir: A_MyDocuments . "\AutoHotkey\Lib\Images"}
+Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionConfigFilePath := "") {
+	Global Diablo2 := {NumSkills: 16, HotkeyCondition: "ahk_classDiablo II", InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}, ImagesDir: A_MyDocuments . "\AutoHotkey\Lib\Images"}
 	; Configuration
 	Diablo2.KeysConfig := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
+
+	; Set up keyboard mappings
+	Hotkey, IfWinActive, % Diablo2.HotkeyCondition
 
 	if (SkillWeaponSetConfigFilePath != "") {
 		; Read the config file
@@ -39,9 +52,7 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 		Diablo2.SkillKeyToWeaponSetMapping := {}
 		Diablo2.SwapWeaponsKey := Diablo2.KeysConfig["Swap Weapons"]
 
-		; Set up the skill mappings
-		Hotkey, IfWinActive, % Diablo2.HotkeyCondition
-
+		; Assign hotkeys
 		Loop, % Diablo2.NumSkills {
 			SkillKey := Diablo2.KeysConfig.Skills[A_Index]
 			SkillWeaponSet := Diablo2.SkillWeaponSetConfig[A_Index]
@@ -52,13 +63,69 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath) {
 			}
 		}
 
-		; Turn off context-sensitive hotkey creation.
-		Hotkey, IfWinActive
-
 		; Macro state
 		Diablo2.CurrentWeaponSet := 1
 		Diablo2.CurrentSkills := ["", ""]
 	}
+
+	if (FillPotionConfigFilePath != "") {
+		; Read the config file
+		Diablo2.FillPotionConfig := Diablo2_Private_SafeParseJSONFile(FillPotionConfigFilePath)
+		Diablo2.FillPotionConfig.Variation := 100
+
+		if (Diablo2.FillPotionConfig.Fullscreen) {
+			; Ensure Screen Shot key is assigned
+			if (Diablo2.KeysConfig["Screen Shot"] == "") {
+				MsgBox, Key for Screen Shot is not assigned; cannot capture screen.
+				ExitApp
+			}
+
+			; Start GDI+ for full screen
+			Diablo2.GdipToken := Gdip_Startup()
+			if (!Diablo2.GdipToken) {
+				MsgBox, GDI+ failed to start. Please ensure you have GDI+ on your system.
+				ExitApp
+			}
+			OnExit("Diablo2_Private_Shutdown")
+
+			; Find installation directory
+			RegRead, InstallPath, HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II, InstallPath
+			Diablo2.InstallPath := InstallPath
+		}
+		else {
+			; Compensate for incorrect coordinates in windowed mode
+			For Location in Diablo2.InventoryCoords {
+				Diablo2.InventoryCoords[Location].Y += 25
+			}
+		}
+
+		; Prepare potion structures
+		for _, Type_ in ["Healing", "Mana"] {
+			Diablo2.FillPotionConfig.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
+		}
+		Diablo2.FillPotionConfig.Potions["Rejuvenation"] := ["Regular", "Full"]
+		; Reverse preference if necessary
+		if (!Diablo2.FillPotionConfig.LesserFirst) {
+			for Type_, Sizes in Diablo2.FillPotionConfig.Potions {
+				; Reverse the array
+				; Hints here: http://www.autohotkey.com/board/topic/45876-ahk-l-arrays/
+				NewSizes := []
+				Loop, % Length := Sizes.Length() {
+					NewSizes.Push(Sizes[Length - A_Index + 1])
+				}
+				Diablo2.FillPotionConfig.Potions[Type_] := NewSizes
+			}
+		}
+
+		; Assign function
+		Diablo2.FillPotionConfig.Function := Func(Diablo2.FillPotionConfig.Fullscreen ? "Diablo2_Private_FillPotionFullscreenWatchDirectory" : "Diablo2_Private_FillPotionWindowed")
+
+		; Assign hotkey
+		Hotkey, % Diablo2.FillPotionConfig.Key, FillPotionHotkeyActivated
+	}
+
+	; Turn off context-sensitive hotkey creation.
+	Hotkey, IfWinActive
 }
 
 /**
@@ -112,29 +179,23 @@ Diablo2_SetKeyBindings() {
 }
 
 /**
- * Fill the potion belt from the inventory.
- * Currently, the game must be windowed for this macro to work. There are plans to support full
- * screen in the future.
- *
- * Arguments:
- * Prefer
- *     Specify which size potions to prefer: "Greater" for potions with more points, "Lesser"
- *     for potions with less points.
+ * Open the inventory.
  *
  * Return value: None
  */
-Diablo2_FillPotion(Prefer := "Lesser") {
+Diablo2_OpenInventory() {
 	global Diablo2
-	; Open inventory and ready for insertion into potion belt.
-	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Inventory Screen"]) "{Shift down}"
-	; Fill potions of each type.
-	for _, Type_ in ["Healing", "Mana"] {
-		Diablo2_Private_FillPotionType(Type_, ["Minor", "Light", "Regular", "Greater", "Super"], Prefer)
-	}
-	Diablo2_Private_FillPotionType("Rejuvenation", ["Regular", "Full"], Prefer)
+	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Inventory Screen"])
+}
 
-	; End insertion and clear screen
-	Send, % "{Shift up}" Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Clear Screen"])
+/**
+ * Clear the screen.
+ *
+ * Return value: None
+ */
+Diablo2_ClearScreen() {
+	global Diablo2
+	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Clear Screen"])
 }
 
 /**************************************************************************************************
@@ -247,55 +308,185 @@ Diablo2_Private_ActivateSkill(SkillKey) {
 }
 
 /**
- * Fill the potion belt with potions of a specified type.
+ * Return the potion image path for a specified type and size.
  *
  * Arguments:
  * Type
- *     The type of potion, either "Healing", "Mana", or "Rejuvenation".
- * Sizes
- *     Array of potion sizes to insert.
+ *     Potion type (Healing, Mana, Rejuvenation)
+ * Size
+ *     Potion size (Minor, Light, Regular, Greater, Super)
+ *
+ * Return value: the image path
+ */
+Diablo2_Private_FillPotionImagePath(Type_, Size) {
+	global Diablo2
+	return Format("{1}\{2}\{3}.png", Diablo2.ImagesDir, Type_, Size)
+}
+
+/**
+ * Open inventory and prepare for potion belt insertion.
  *
  * Return value: None
  */
-Diablo2_Private_FillPotionType(Type_, Sizes, Prefer) {
+Diablo2_Private_FillPotionBegin() {
+	Diablo2_OpenInventory()
+	Send, {Shift down}
+}
+
+/**
+ * Perform a click to insert a potion into the belt.
+ *
+ * Arguments:
+ * Coords
+ *     Coordinates of the intended click.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionClick(X, Y) {
+	; The sleeps here are totally emperical. Just seems to work best this way.
+	;Sleep, 100
+	MouseGetPos, MouseX, MouseY
+	LButtonIsDown := GetKeyState("LButton")
+	; Click doesn't support expressions (at all). Hence the use of X and Y above.
+	Click, %X%, %Y%
+	MouseMove, MouseX, MouseY
+	if (LButtonIsDown) {
+		Send, {LButton down}
+	}
+	Sleep, 100
+}
+
+/**
+ * End potion belt insertion and clear the screen.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionEnd() {
+	Send, {Shift up}
+	Diablo2_ClearScreen()
+}
+
+/**
+ * Call the configured fill potion function.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionActivated() {
 	global Diablo2
-	if (Prefer == "Greater") {
-		; Reverse the array
-		; Hints here: http://www.autohotkey.com/board/topic/45876-ahk-l-arrays/
-		Loop, % Sizes.Length() {
-			Sizes.InsertAt(0, Sizes.Pop())
+	Diablo2.FillPotionConfig.Function.Call()
+}
+
+/**
+ * Fill the potion belt in windowed mode.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionWindowed() {
+	global Diablo2
+
+	Diablo2_Private_FillPotionBegin()
+	for Type_, Sizes in Diablo2.FillPotionConfig.Potions {
+		LastPotion := {X: -1, Y: -1}
+		WindowedSizeLoop:
+		for _, Size in Sizes {
+			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
+			Loop {
+				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{1} {2}", Diablo2.FillPotionConfig.Variation, NeedlePath)
+				if (ErrorLevel == 2) {
+					MsgBox, % "Needle image file not found " . NeedlePath
+					ExitApp
+				}
+				if (ErrorLevel == 1) {
+					break ; Image not found on the screen.
+				}
+				if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
+					break, WindowedSizeLoop ; Potion belt is full of potions of this type.
+				}
+				Diablo2_Private_FillPotionClick(PotionX, PotionY)
+				LastPotion := {X: PotionX, Y: PotionY}
+			}
 		}
 	}
+	Diablo2_Private_FillPotionEnd()
+}
 
-	LastPotion := {X: -1, Y: -1}
-	SizeLoop:
-	For _, Size in Sizes {
-		ImagePath := Format("{1}\{2}\{3}.png", Diablo2.ImagesDir, Type_, Size)
-		Loop {
-			ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, *130 %ImagePath%
-			if (ErrorLevel == 2) {
-				MsgBox, % "Image file not found " . ImagePath
+/**
+ * Watch the Diablo II installation directory for new screenshots.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionFullscreenWatchDirectory() {
+	global Diablo2
+
+	Diablo2_Private_FillPotionBegin()
+	; Note: InstallPath has a trailing slash
+	; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a screenshot.
+	; Triple question marks ("???") don't seem to work, but "*" should be fine.
+	WatchDirectory(Diablo2.InstallPath . "|Screenshot*.jpg", Func("Diablo2_Private_FillPotionFullscreen"), 0x10)
+	Sleep, 100 ; Wait for the inventory to appear
+	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Screen Shot"])
+}
+
+/**
+ * Fill the potion belt in fullscreen mode.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
+	; In both master (which has incorrect docs) and v2-alpha (which has correct docs), the callback
+	; function takes three arguments:
+	;
+	; - WatchDirectory "this" object (not quite sure what this is)
+	; - "from path"
+	; - "to path"
+	;
+	; Both the "from" and "to" paths will be populated for FILE_NOTIFY_CHANGE_LAST_WRITE, but
+	; we'll just use the latter.
+	global Diablo2
+
+	WatchDirectory("") ; Stop watching directory
+
+	; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the bugs. w and h are supposed (?) to represent width and height; they are used as such in the AHK code but not the C code. This causes problems and an inability to find the needle. We are now using MasterFocus' Gdip_ImageSearch, which works well.
+	; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
+	HaystackBitmap := Gdip_CreateBitmapFromFile(HaystackPath)
+	for Type_, Sizes in Diablo2.FillPotionConfig.Potions {
+		for _, Size in Sizes {
+			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
+			NeedleBitmap := Gdip_CreateBitmapFromFile(NeedlePath)
+			CoordsListString := ""
+			; The last 0 instructs Gdip_ImageSearch to find all instances.
+			NumImagesFound := Gdip_ImageSearch(HaystackBitmap, NeedleBitmap, CoordsListString, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y, Diablo2.FillPotionConfig.Variation, , , 0)
+			if (NumImagesFound < 0) {
+				; Anything less than 0 indicates an error.
+				Log.Close()
+				MsgBox, % "Call to Gdip_ImageSearch failed with error code " . Retval
 				ExitApp
 			}
-			if (ErrorLevel == 1) {
-				break ; Image not found on the screen.
+			if (NumImagesFound > 0) {
+				; XXX: Since it's not easy to get updating screenshots, just click all of the potions.
+				for _, CoordsString in StrSplit(CoordsListString, "`n") {
+					Coords := StrSplit(CoordsString, "`,")
+					Potion := {X: Coords[1], Y: Coords[2]}
+					Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
+				}
 			}
-			if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
-				break, SizeLoop ; Potion belt is full of potions of this type.
-			}
-			; The sleeps here are totally emperical. Just seems to work best this way.
-			Sleep, 100
-			MouseGetPos, MouseX, MouseY
-			LButtonIsDown := GetKeyState("LButton")
-			Click, %PotionX%, %PotionY%
-			MouseMove, MouseX, MouseY
-			if (LButtonIsDown) {
-				Send, {LButton down}
-			}
-			Sleep, 100
-			LastPotion := {X: PotionX, Y: PotionY}
+			Gdip_DisposeImage(NeedleBitmap)
 		}
 	}
+	Diablo2_Private_FillPotionEnd()
+	Gdip_DisposeImage(HaystackBitmap)
+	; Remove the screen shot; it is not needed any more.
+	FileDelete, %HaystackPath%
+}
+
+/**
+ * Perform shutdown tasks (close GDI+).
+ *
+ * Return value: None
+ */
+Diablo2_Private_Shutdown() {
+	global Diablo2
+	Gdip_Shutdown(Diablo2.GdipToken)
 }
 
 goto, End
@@ -303,6 +494,11 @@ goto, End
 ; Handle all skill hotkeys with a preferred weapon set.
 SkillHotkeyActivated:
 Diablo2_Private_ActivateSkill(A_ThisHotkey)
+return
+
+; Handle fill potion hotkey
+FillPotionHotkeyActivated:
+Diablo2_Private_FillPotionActivated()
 return
 
 End:

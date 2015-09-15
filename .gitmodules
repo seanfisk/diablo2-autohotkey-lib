@@ -1,3 +1,15 @@
 [submodule "Vendor/JSON"]
 	path = Vendor/JSON
 	url = https://github.com/cocobelgica/AutoHotkey-JSON.git
+[submodule "Vendor\\_Struct"]
+	path = Vendor\\_Struct
+	url = https://github.com/HotKeyIt/_Struct.git
+[submodule "Vendor\\WatchDirectory"]
+	path = Vendor\\WatchDirectory
+	url = https://github.com/HotKeyIt/WatchDirectory.git
+[submodule "Vendor\\Gdip"]
+	path = Vendor\\Gdip
+	url = https://github.com/tariqporter/Gdip.git
+[submodule "Vendor\\MasterFocus"]
+	path = Vendor\\MasterFocus
+	url = https://github.com/MasterFocus/AutoHotkey.git
