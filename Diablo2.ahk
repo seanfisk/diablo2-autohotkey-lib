@@ -492,12 +492,13 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 }
 
 /**
- * Perform shutdown tasks (close GDI+).
+ * Perform shutdown tasks. Only needed for FillPotion Fullscreen mode.
  *
  * Return value: None
  */
 Diablo2_Private_Shutdown() {
 	global Diablo2
+	WatchDirectory("") ; Stop watching all directories
 	Gdip_Shutdown(Diablo2.GdipToken)
 }
 
