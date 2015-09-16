@@ -73,32 +73,6 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(FillPotionConfigFilePath)
 		Diablo2.FillPotion.Variation := 100
 
-		if (Diablo2.FillPotion.Fullscreen) {
-			; Ensure Screen Shot key is assigned
-			if (Diablo2.Keys["Screen Shot"] == "") {
-				MsgBox, Key for Screen Shot is not assigned; cannot capture screen.
-				ExitApp
-			}
-
-			; Start GDI+ for full screen
-			Diablo2.GdipToken := Gdip_Startup()
-			if (!Diablo2.GdipToken) {
-				MsgBox, GDI+ failed to start. Please ensure you have GDI+ on your system.
-				ExitApp
-			}
-			OnExit("Diablo2_Private_Shutdown")
-
-			; Find installation directory
-			RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
-			Diablo2.InstallPath := InstallPath
-		}
-		else {
-			; Compensate for incorrect coordinates in windowed mode
-			For Location in Diablo2.InventoryCoords {
-				Diablo2.InventoryCoords[Location].Y += 25
-			}
-		}
-
 		; Prepare potion structures
 		for _, Type_ in ["Healing", "Mana"] {
 			Diablo2.FillPotion.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
@@ -114,6 +88,39 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 					NewSizes.Push(Sizes[Length - A_Index + 1])
 				}
 				Diablo2.FillPotion.Potions[Type_] := NewSizes
+			}
+		}
+
+		if (Diablo2.FillPotion.Fullscreen) {
+			; Ensure Screen Shot key is assigned
+			if (Diablo2.Keys["Screen Shot"] == "") {
+				MsgBox, Key for Screen Shot is not assigned; cannot capture screen.
+				ExitApp
+			}
+
+			; Start GDI+ for full screen
+			Diablo2.GdipToken := Gdip_Startup()
+			if (!Diablo2.GdipToken) {
+				MsgBox, GDI+ failed to start. Please ensure you have GDI+ on your system.
+				ExitApp
+			}
+			OnExit("Diablo2_Private_Shutdown")
+
+			; Cache needle bitmaps
+			For Type_, Sizes in Diablo2.FillPotion.Potions {
+				For _, Size in Sizes {
+					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Gdip_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
+				}
+			}
+
+			; Find installation directory
+			RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
+			Diablo2.InstallPath := InstallPath
+		}
+		else {
+			; Compensate for incorrect coordinates in windowed mode
+			For Location in Diablo2.InventoryCoords {
+				Diablo2.InventoryCoords[Location].Y += 25
 			}
 		}
 
@@ -463,11 +470,9 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 	HaystackBitmap := Gdip_CreateBitmapFromFile(HaystackPath)
 	for Type_, Sizes in Diablo2.FillPotion.Potions {
 		for _, Size in Sizes {
-			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
-			NeedleBitmap := Gdip_CreateBitmapFromFile(NeedlePath)
 			CoordsListString := ""
 			; The last 0 instructs Gdip_ImageSearch to find all instances.
-			NumImagesFound := Gdip_ImageSearch(HaystackBitmap, NeedleBitmap, CoordsListString, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y, Diablo2.FillPotion.Variation, , , 0)
+			NumImagesFound := Gdip_ImageSearch(HaystackBitmap, Diablo2.FillPotion.NeedleBitmaps[Type_][Size], CoordsListString, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y, Diablo2.FillPotion.Variation, , , 0)
 			if (NumImagesFound < 0) {
 				; Anything less than 0 indicates an error.
 				Log.Close()
@@ -482,7 +487,6 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 					Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
 				}
 			}
-			Gdip_DisposeImage(NeedleBitmap)
 		}
 	}
 	Diablo2_Private_FillPotionEnd()
@@ -499,6 +503,11 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 Diablo2_Private_Shutdown() {
 	global Diablo2
 	WatchDirectory("") ; Stop watching all directories
+	For Type_, Sizes in Diablo2.FillPotion.NeedleBitmaps {
+		For _, Bitmap in Sizes {
+			Gdip_DisposeImage(Bitmap)
+		}
+	}
 	Gdip_Shutdown(Diablo2.GdipToken)
 }
 
