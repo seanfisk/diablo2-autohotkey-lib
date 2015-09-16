@@ -39,43 +39,43 @@ CoordMode, Mouse, Client
  * Return value: None
  */
 Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionConfigFilePath := "") {
-	Global Diablo2 := {NumSkills: 16, HotkeyCondition: "ahk_classDiablo II", InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}, ImagesDir: A_MyDocuments . "\AutoHotkey\Lib\Images"}
+	Diablo2_InitConstants()
+	global Diablo2
+
 	; Configuration
-	Diablo2.KeysConfig := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
+	Diablo2.Keys := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
 
 	; Set up keyboard mappings
 	Hotkey, IfWinActive, % Diablo2.HotkeyCondition
 
 	if (SkillWeaponSetConfigFilePath != "") {
-		; Read the config file
-		Diablo2.SkillWeaponSetConfig := Diablo2_Private_SafeParseJSONFile(SkillWeaponSetConfigFilePath)
-		Diablo2.SkillKeyToWeaponSetMapping := {}
-		Diablo2.SwapWeaponsKey := Diablo2.KeysConfig["Swap Weapons"]
+		Diablo2.Skills := {Max: 16
+		, WeaponSetForKey: {}
+		, SwapKey: Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Swap Weapons"])}
 
-		; Assign hotkeys
-		Loop, % Diablo2.NumSkills {
-			SkillKey := Diablo2.KeysConfig.Skills[A_Index]
-			SkillWeaponSet := Diablo2.SkillWeaponSetConfig[A_Index]
-			if (SkillKey != "") {
-				Diablo2.SkillKeyToWeaponSetMapping[SkillKey] := SkillWeaponSet
+		; Read the config file and assign hotkeys
+		WeaponSetForSkill := Diablo2_Private_SafeParseJSONFile(SkillWeaponSetConfigFilePath)
+		Loop, % Diablo2.Skills.Max {
+			Key := Diablo2.Keys.Skills[A_Index]
+			if (Key != "") {
+				Diablo2.Skills.WeaponSetForKey[Key] := WeaponSetForSkill[A_Index]
 				; Make each skill a hotkey so we can track the current skill.
-				Hotkey, %SkillKey%, SkillHotkeyActivated
+				Hotkey, %Key%, SkillHotkeyActivated
 			}
 		}
 
 		; Macro state
-		Diablo2.CurrentWeaponSet := 1
-		Diablo2.CurrentSkills := ["", ""]
+		Diablo2.Skills.Current := {WeaponSet: 1, Skills: ["", ""]}
 	}
 
 	if (FillPotionConfigFilePath != "") {
 		; Read the config file
-		Diablo2.FillPotionConfig := Diablo2_Private_SafeParseJSONFile(FillPotionConfigFilePath)
-		Diablo2.FillPotionConfig.Variation := 100
+		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(FillPotionConfigFilePath)
+		Diablo2.FillPotion.Variation := 100
 
-		if (Diablo2.FillPotionConfig.Fullscreen) {
+		if (Diablo2.FillPotion.Fullscreen) {
 			; Ensure Screen Shot key is assigned
-			if (Diablo2.KeysConfig["Screen Shot"] == "") {
+			if (Diablo2.Keys["Screen Shot"] == "") {
 				MsgBox, Key for Screen Shot is not assigned; cannot capture screen.
 				ExitApp
 			}
@@ -89,7 +89,7 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 			OnExit("Diablo2_Private_Shutdown")
 
 			; Find installation directory
-			RegRead, InstallPath, HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II, InstallPath
+			RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
 			Diablo2.InstallPath := InstallPath
 		}
 		else {
@@ -101,31 +101,44 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 
 		; Prepare potion structures
 		for _, Type_ in ["Healing", "Mana"] {
-			Diablo2.FillPotionConfig.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
+			Diablo2.FillPotion.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
 		}
-		Diablo2.FillPotionConfig.Potions["Rejuvenation"] := ["Regular", "Full"]
+		Diablo2.FillPotion.Potions["Rejuvenation"] := ["Regular", "Full"]
 		; Reverse preference if necessary
-		if (!Diablo2.FillPotionConfig.LesserFirst) {
-			for Type_, Sizes in Diablo2.FillPotionConfig.Potions {
+		if (!Diablo2.FillPotion.LesserFirst) {
+			for Type_, Sizes in Diablo2.FillPotion.Potions {
 				; Reverse the array
 				; Hints here: http://www.autohotkey.com/board/topic/45876-ahk-l-arrays/
 				NewSizes := []
 				Loop, % Length := Sizes.Length() {
 					NewSizes.Push(Sizes[Length - A_Index + 1])
 				}
-				Diablo2.FillPotionConfig.Potions[Type_] := NewSizes
+				Diablo2.FillPotion.Potions[Type_] := NewSizes
 			}
 		}
 
 		; Assign function
-		Diablo2.FillPotionConfig.Function := Func(Diablo2.FillPotionConfig.Fullscreen ? "Diablo2_Private_FillPotionFullscreenWatchDirectory" : "Diablo2_Private_FillPotionWindowed")
+		Diablo2.FillPotion.Function := Func(Diablo2.FillPotion.Fullscreen ? "Diablo2_Private_FillPotionFullscreenWatchDirectory" : "Diablo2_Private_FillPotionWindowed")
 
 		; Assign hotkey
-		Hotkey, % Diablo2.FillPotionConfig.Key, FillPotionHotkeyActivated
+		Hotkey, % Diablo2.FillPotion.Key, FillPotionHotkeyActivated
 	}
 
 	; Turn off context-sensitive hotkey creation.
 	Hotkey, IfWinActive
+}
+
+/**
+  * Initialize constants used by the macros. If you are using Diablo2_Init(), this will be called
+  * for you.
+  *
+  * Return value: None
+  */
+ Diablo2_InitConstants() {
+	global Diablo2 := {HotkeyCondition: "ahk_classDiablo II"
+		, InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}
+		, ImagesDir: A_MyDocuments . "\AutoHotkey\Lib\Images"
+		, RegistryKey: "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"}
 }
 
 /**
@@ -137,11 +150,12 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
  * Return value: None
  */
 Diablo2_StartGame() {
-	Global Diablo2
+	Diablo2_InitConstants()
+	global Diablo2
 	for _, Var in ["GamePath", "CmdLine"] {
 		; CmdLine typically contains -skiptobnet, which is what we want. But this allows the user
 		; to change it through the registry as well.
-		RegRead, %Var%, HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II, %Var%
+		RegRead, %Var%, % Diablo2.RegistryKey, %Var%
 	}
 	SplitPath, GamePath, , GameDir
 	Run, %GamePath% %CmdLine%, %GameDir%
@@ -157,11 +171,11 @@ Diablo2_StartGame() {
  * Return value: None
  */
 Diablo2_SetKeyBindings() {
-	Global Diablo2
+	global Diablo2
 	; Suspend all hotkeys while assigning key bindings.
 	Suspend On
 
-	for KeyFunction, Value in Diablo2.KeysConfig
+	for KeyFunction, Value in Diablo2.Keys
 	{
 		if (KeyFunction == "Skills" or KeyFunction == "Belt") {
 			; Each of these names contain a list of keys.
@@ -185,7 +199,7 @@ Diablo2_SetKeyBindings() {
  */
 Diablo2_OpenInventory() {
 	global Diablo2
-	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Inventory Screen"])
+	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Inventory Screen"])
 }
 
 /**
@@ -195,7 +209,7 @@ Diablo2_OpenInventory() {
  */
 Diablo2_ClearScreen() {
 	global Diablo2
-	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Clear Screen"])
+	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Clear Screen"])
 }
 
 /**************************************************************************************************
@@ -237,7 +251,7 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
  *
  * Return value: The key in Send syntax.
  */
-Diablo2_Private_HotkeySyntaxToSendKeySyntax(HotkeyString) {
+Diablo2_Private_HotkeySyntaxToSendSyntax(HotkeyString) {
 	if (StrLen(HotkeyString) > 1) {
 		return "{" HotkeyString "}"
 	}
@@ -255,12 +269,12 @@ Diablo2_Private_HotkeySyntaxToSendKeySyntax(HotkeyString) {
  * Return value: None
  */
 Diablo2_Private_AssignKeyAndAdvance(KeyString) {
-	Global Diablo2
+	global Diablo2
 	if (KeyString == "") {
 		Send, {Delete}
 	}
 	else {
-		Send, % "{Enter}" Diablo2_Private_HotkeySyntaxToSendKeySyntax(KeyString)
+		Send, % "{Enter}" Diablo2_Private_HotkeySyntaxToSendSyntax(KeyString)
 	}
 	Send, {Down}
 }
@@ -269,16 +283,15 @@ Diablo2_Private_AssignKeyAndAdvance(KeyString) {
  * Activate the skill indicated by the hotkey pressed.
  *
  * Arguments:
- * SkillKey
+ * Key
  *     The pressed skill hotkey.
  *
  * Return value: None
  */
-Diablo2_Private_ActivateSkill(SkillKey) {
-	Global Diablo2
-	PreferredWeaponSet := Diablo2.SkillKeyToWeaponSetMapping[SkillKey]
-	SwitchWeaponSet := (PreferredWeaponSet != ""
-		and PreferredWeaponSet != Diablo2.CurrentWeaponSet)
+Diablo2_Private_ActivateSkill(Key) {
+	global Diablo2
+	PreferredWeaponSet := Diablo2.Skills.WeaponSetForKey[Key]
+	SwitchWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != Diablo2.Skills.Current.WeaponSet)
 
 	; Suspend all hotkeys while this stuff is happening.
 	; This decreases the chance of the game and macros getting out-of-sync.
@@ -286,21 +299,20 @@ Diablo2_Private_ActivateSkill(SkillKey) {
 
 	if (SwitchWeaponSet) {
 		; Swap to the other weapon
-		SwapWeaponsKey := Diablo2.SwapWeaponsKey
-		Send, % Diablo2.SwapWeaponsKey
-		Diablo2.CurrentWeaponSet := PreferredWeaponSet
+		Send, % Diablo2.Skills.SwapKey
+		Diablo2.Skills.Current.WeaponSet := PreferredWeaponSet
 	}
 
-	if (Diablo2.CurrentSkills[Diablo2.CurrentWeaponSet] != SkillKey) {
+	if (Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] != Key) {
 		if (SwitchWeaponSet) {
 			; If we just switched weapons, we need to sleep very slightly
 			; while the game actually swaps weapons.
 			Sleep, 70
 		}
 
-		Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(SkillKey)
+		Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
 
-		Diablo2.CurrentSkills[Diablo2.CurrentWeaponSet] := SkillKey
+		Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] := Key
 	}
 
 	; Turn on hotkeys.
@@ -373,7 +385,7 @@ Diablo2_Private_FillPotionEnd() {
  */
 Diablo2_Private_FillPotionActivated() {
 	global Diablo2
-	Diablo2.FillPotionConfig.Function.Call()
+	Diablo2.FillPotion.Function.Call()
 }
 
 /**
@@ -385,13 +397,13 @@ Diablo2_Private_FillPotionWindowed() {
 	global Diablo2
 
 	Diablo2_Private_FillPotionBegin()
-	for Type_, Sizes in Diablo2.FillPotionConfig.Potions {
+	for Type_, Sizes in Diablo2.FillPotion.Potions {
 		LastPotion := {X: -1, Y: -1}
 		WindowedSizeLoop:
 		for _, Size in Sizes {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			Loop {
-				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{1} {2}", Diablo2.FillPotionConfig.Variation, NeedlePath)
+				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{1} {2}", Diablo2.FillPotion.Variation, NeedlePath)
 				if (ErrorLevel == 2) {
 					MsgBox, % "Needle image file not found " . NeedlePath
 					ExitApp
@@ -424,7 +436,7 @@ Diablo2_Private_FillPotionFullscreenWatchDirectory() {
 	; Triple question marks ("???") don't seem to work, but "*" should be fine.
 	WatchDirectory(Diablo2.InstallPath . "|Screenshot*.jpg", Func("Diablo2_Private_FillPotionFullscreen"), 0x10)
 	Sleep, 100 ; Wait for the inventory to appear
-	Send, % Diablo2_Private_HotkeySyntaxToSendKeySyntax(Diablo2.KeysConfig["Screen Shot"])
+	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Screen Shot"])
 }
 
 /**
@@ -449,13 +461,13 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 	; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the bugs. w and h are supposed (?) to represent width and height; they are used as such in the AHK code but not the C code. This causes problems and an inability to find the needle. We are now using MasterFocus' Gdip_ImageSearch, which works well.
 	; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
 	HaystackBitmap := Gdip_CreateBitmapFromFile(HaystackPath)
-	for Type_, Sizes in Diablo2.FillPotionConfig.Potions {
+	for Type_, Sizes in Diablo2.FillPotion.Potions {
 		for _, Size in Sizes {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			NeedleBitmap := Gdip_CreateBitmapFromFile(NeedlePath)
 			CoordsListString := ""
 			; The last 0 instructs Gdip_ImageSearch to find all instances.
-			NumImagesFound := Gdip_ImageSearch(HaystackBitmap, NeedleBitmap, CoordsListString, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y, Diablo2.FillPotionConfig.Variation, , , 0)
+			NumImagesFound := Gdip_ImageSearch(HaystackBitmap, NeedleBitmap, CoordsListString, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y, Diablo2.FillPotion.Variation, , , 0)
 			if (NumImagesFound < 0) {
 				; Anything less than 0 indicates an error.
 				Log.Close()
