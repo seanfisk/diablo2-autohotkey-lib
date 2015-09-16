@@ -71,7 +71,6 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 	if (FillPotionConfigFilePath != "") {
 		; Read the config file
 		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(FillPotionConfigFilePath)
-		Diablo2.FillPotion.Variation := 100
 
 		; Prepare potion structures
 		for _, Type_ in ["Healing", "Mana"] {
@@ -93,10 +92,12 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 
 		if (Diablo2.FillPotion.Fullscreen) {
 			; Ensure Screen Shot key is assigned
-			if (Diablo2.Keys["Screen Shot"] == "") {
+			ScreenShotKey := Diablo2.Keys["Screen Shot"]
+			if (ScreenShotKey == "") {
 				MsgBox, Key for Screen Shot is not assigned; cannot capture screen.
 				ExitApp
 			}
+			Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_HotkeySyntaxToSendSyntax(ScreenShotKey)
 
 			; Start GDI+ for full screen
 			Diablo2.GdipToken := Gdip_Startup()
@@ -125,7 +126,7 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 		}
 
 		; Assign function
-		Diablo2.FillPotion.Function := Func(Diablo2.FillPotion.Fullscreen ? "Diablo2_Private_FillPotionFullscreenWatchDirectory" : "Diablo2_Private_FillPotionWindowed")
+		Diablo2.FillPotion.Function := Func(Diablo2.FillPotion.Fullscreen ? "Diablo2_Private_FillPotionFullscreenBegin" : "Diablo2_Private_FillPotionWindowed")
 
 		; Assign hotkey
 		Hotkey, % Diablo2.FillPotion.Key, FillPotionHotkeyActivated
@@ -266,6 +267,13 @@ Diablo2_Private_HotkeySyntaxToSendSyntax(HotkeyString) {
 }
 
 /**
+ * Return the minimum of two parameters.
+ */
+Diablo2_Private_Min(A, B) {
+	return A < B ? A : B
+}
+
+/**
  * Assign a single key binding in the "Configure Controls" screen, advancing to the next control
  * afterward.
  *
@@ -327,6 +335,16 @@ Diablo2_Private_ActivateSkill(Key) {
 }
 
 /**
+ * Call the configured fill potion function.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionActivated() {
+	global Diablo2
+	Diablo2.FillPotion.Function.Call()
+}
+
+/**
  * Return the potion image path for a specified type and size.
  *
  * Arguments:
@@ -363,7 +381,7 @@ Diablo2_Private_FillPotionBegin() {
  */
 Diablo2_Private_FillPotionClick(X, Y) {
 	; The sleeps here are totally emperical. Just seems to work best this way.
-	;Sleep, 100
+	Sleep, 150
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
 	; Click doesn't support expressions (at all). Hence the use of X and Y above.
@@ -372,7 +390,7 @@ Diablo2_Private_FillPotionClick(X, Y) {
 	if (LButtonIsDown) {
 		Send, {LButton down}
 	}
-	Sleep, 100
+	Sleep, 150
 }
 
 /**
@@ -383,16 +401,6 @@ Diablo2_Private_FillPotionClick(X, Y) {
 Diablo2_Private_FillPotionEnd() {
 	Send, {Shift up}
 	Diablo2_ClearScreen()
-}
-
-/**
- * Call the configured fill potion function.
- *
- * Return value: None
- */
-Diablo2_Private_FillPotionActivated() {
-	global Diablo2
-	Diablo2.FillPotion.Function.Call()
 }
 
 /**
@@ -410,7 +418,7 @@ Diablo2_Private_FillPotionWindowed() {
 		for _, Size in Sizes {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			Loop {
-				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{1} {2}", Diablo2.FillPotion.Variation, NeedlePath)
+				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, *120 %NeedlePath%
 				if (ErrorLevel == 2) {
 					MsgBox, % "Needle image file not found " . NeedlePath
 					ExitApp
@@ -434,16 +442,20 @@ Diablo2_Private_FillPotionWindowed() {
  *
  * Return value: None
  */
-Diablo2_Private_FillPotionFullscreenWatchDirectory() {
+Diablo2_Private_FillPotionFullscreenBegin() {
 	global Diablo2
 
+	; Initialize structures
+	for Type_ in Diablo2.FillPotion.Potions {
+		Diablo2.FillPotion["State", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
+	}
 	Diablo2_Private_FillPotionBegin()
 	; Note: InstallPath has a trailing slash
 	; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a screenshot.
 	; Triple question marks ("???") don't seem to work, but "*" should be fine.
 	WatchDirectory(Diablo2.InstallPath . "|Screenshot*.jpg", Func("Diablo2_Private_FillPotionFullscreen"), 0x10)
 	Sleep, 100 ; Wait for the inventory to appear
-	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Screen Shot"])
+	Send, % Diablo2.FillPotion.ScreenShotKey
 }
 
 /**
@@ -463,36 +475,137 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 	; we'll just use the latter.
 	global Diablo2
 
-	WatchDirectory("") ; Stop watching directory
+	;~ Log := FileOpen("Log.txt", "a")
+	;~ Log.Write(Format("FillPotion: Processing {1}`r`n", HaystackPath))
+	;~ Log.Close()
 
 	; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the bugs. w and h are supposed (?) to represent width and height; they are used as such in the AHK code but not the C code. This causes problems and an inability to find the needle. We are now using MasterFocus' Gdip_ImageSearch, which works well.
 	; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
 	HaystackBitmap := Gdip_CreateBitmapFromFile(HaystackPath)
+	; Assume we are finished for now; invalidate later if we are not.
+	Finished := true
+
 	for Type_, Sizes in Diablo2.FillPotion.Potions {
-		for _, Size in Sizes {
-			CoordsListString := ""
-			; The last 0 instructs Gdip_ImageSearch to find all instances.
-			NumImagesFound := Gdip_ImageSearch(HaystackBitmap, Diablo2.FillPotion.NeedleBitmaps[Type_][Size], CoordsListString, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y, Diablo2.FillPotion.Variation, , , 0)
-			if (NumImagesFound < 0) {
-				; Anything less than 0 indicates an error.
-				Log.Close()
-				MsgBox, % "Call to Gdip_ImageSearch failed with error code " . Retval
+		if (Diablo2.FillPotion.State[Type_].Finished) {
+			; We have already finished finding potions of this type.
+			continue
+		}
+		PotionsClicked := []
+		PotionSizeLoop:
+		Loop {
+			Size := Sizes[Diablo2.FillPotion.State[Type_].SizeIndex]
+			;~ Log := FileOpen("Log.txt", "a")
+			;~ Log.Write(Format("{1:-12}: Searching {2}`r`n", Type_, Size))
+			;~ Log.Close()
+			NumPotionsFound := Gdip_ImageSearch(HaystackBitmap
+				, Diablo2.FillPotion.NeedleBitmaps[Type_][Size]
+				, CoordsListString
+				, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y
+				, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y
+				, 80 ; Variation; determined emperically
+				; These two blank parameters are transparency color and search direction.
+				, ,
+				; For the number of instances to find, pass one more than the user requested so that we
+				; can terminate early if possible. If they passed 0, find all instances with 0.
+				, Diablo2.FillPotion.FullscreenPotionsPerScreenshot == 0 ? 0 : Diablo2.FillPotion.FullscreenPotionsPerScreenshot + 1)
+
+			; Anything less than 0 indicates an error.
+			if (NumPotionsFound < 0) {
+				MsgBox, % "Call to Gdip_ImageSearch failed with error code " . NumPotionsFound
 				ExitApp
 			}
-			if (NumImagesFound > 0) {
-				; XXX: Since it's not easy to get updating screenshots, just click all of the potions.
-				for _, CoordsString in StrSplit(CoordsListString, "`n") {
-					Coords := StrSplit(CoordsString, "`,")
-					Potion := {X: Coords[1], Y: Coords[2]}
-					Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
+
+			; Collect all the potions we found into an array.
+			PotionsFound := []
+			for _3, CoordsString in StrSplit(CoordsListString, "`n") {
+				Coords := StrSplit(CoordsString, "`,")
+				PotionFound := {X: Coords[1], Y: Coords[2]}
+				;~ Log := FileOpen("Log.txt", "a")
+				;~ Log.Write(Format("{1:-12}: Found {2} at {3},{4}`r`n", Type_, Size, PotionFound.X, PotionFound.Y))
+				;~ Log.Close()
+				; If any of the potions found were clicked before, the potion belt is already full
+				; of this type and we are finished with it.
+				for _4, PotionClicked in Diablo2.FillPotion.State[Type_].PotionsClicked {
+					if (PotionFound.X == PotionClicked.X and PotionFound.Y == PotionClicked.Y) {
+						Diablo2.FillPotion.State[Type_].Finished := true
+						;~ Log := FileOpen("Log.txt", "a")
+						;~ Log.Write(Format("{1:-12}: Finished for run due to full belt`r`n", Type_))
+						;~ Log.Close()
+						break, PotionSizeLoop
+					}
 				}
+				PotionsFound.Push(PotionFound)
+			}
+
+			; Click potions.
+			NumPotionsAllowedToClick := Diablo2.FillPotion.FullscreenPotionsPerScreenshot == 0 ? NumPotionsFound : (Diablo2.FillPotion.FullscreenPotionsPerScreenshot - PotionsClicked.Length())
+			Loop, % Diablo2_Private_Min(NumPotionsAllowedToClick, NumPotionsFound) {
+				Potion := PotionsFound[A_Index]
+				;~ Log := FileOpen("Log.txt", "a")
+				;~ Log.Write(Format("{1:-12}: Clicking {2} at {3},{4}`r`n", Type_, Size, Potion.X, Potion.Y))
+				;~ Log.Close()
+				Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
+				PotionsClicked.Push(Potion)
+			}
+
+			if (NumPotionsFound > NumPotionsAllowedToClick) {
+				; If we found more potions than we are allowed to click, we are definitely not finished.
+				; But we can't click any more potions of this type for this screenshot.
+				Finished := false
+				;~ Log := FileOpen("Log.txt", "a")
+				;~ Log.Write(Format("{1:-12}: Finished for screenshot`r`n", Type_))
+				;~ Log.Close()
+				break
+			}
+
+			; Move on to the next size.
+			++Diablo2.FillPotion.State[Type_].SizeIndex
+
+			; Check to see if we have run out of potion sizes for this type. This has happened if
+			; the size index has been incremented beyond the bounds of the size array.
+			if Diablo2.FillPotion.State[Type_].SizeIndex > Sizes.Length() {
+				Diablo2.FillPotion.State[Type_].Finished := true
+				;~ Log := FileOpen("Log.txt", "a")
+				;~ Log.Write(Format("{1:-12}: Finished because no potions left`r`n", Type_))
+				;~ Log.Close()
+				break
 			}
 		}
+
+		; Record all the potions of this type we clicked for this screenshot.
+		Diablo2.FillPotion.State[Type_].PotionsClicked := PotionsClicked
 	}
-	Diablo2_Private_FillPotionEnd()
+
 	Gdip_DisposeImage(HaystackBitmap)
 	; Remove the screen shot; it is not needed any more.
 	FileDelete, %HaystackPath%
+
+	if (Finished) {
+		; If we are still considered finished, check to see if every type has finished.
+		for Type_, Obj in Diablo2.FillPotion.State {
+			if (!Obj.Finished) {
+				; We still have potions over which to iterate.
+				Finished := false
+			}
+		}
+	}
+	if (Finished) {
+		;~ Log := FileOpen("Log.txt", "a")
+		;~ Log.Write("FillPotion: Finishing run`r`n")
+		;~ Log.Close()
+		WatchDirectory("") ; Stop watching directories
+		Diablo2_Private_FillPotionEnd()
+	}
+	else {
+		;~ Log := FileOpen("Log.txt", "a")
+		;~ Log.Write("FillPotion: Requesting updated screenshot`r`n")
+		;~ Log.Close()
+		; Wait slightly for the game to update
+		; Sleep, 100
+
+		; Get the next screenshot
+		Send, % Diablo2.FillPotion.ScreenShotKey
+	}
 }
 
 /**
