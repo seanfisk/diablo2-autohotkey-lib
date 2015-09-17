@@ -22,7 +22,9 @@ For _, BaseName in ["_Struct", "sizeof"] {
 	InstallFile(Format("Vendor\_Struct\{}.ahk", BaseName))
 }
 InstallFile("Vendor\Gdip\Gdip.ahk")
-InstallFile("Vendor\MasterFocus\Functions\Gdip_ImageSearch\Gdip_ImageSearch.ahk")
+;InstallFile("Vendor\MasterFocus\Functions\Gdip_ImageSearch\Gdip_ImageSearch.ahk")
+; TODO: Correctly integrate our modifications to MasterFocus's Gdip_ImageSearch
+InstallFile("Vendor\Gdip_ImageSearch.ahk")
 FileCopyDir, Images, %AutoHotkeyLibDir%\Images, true
 ; Compile after installing, as Diablo2Run.ahk makes use of Diablo2.ahk.
 RunWait, %Ahk2ExePath% /in Diablo2Run.ahk /out %AutoHotkeyLibDir%\Diablo2Run.exe /icon D2.ico
