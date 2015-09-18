@@ -157,7 +157,8 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 	global Diablo2 := {HotkeyCondition: "ahk_classDiablo II"
 		, InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}
 		, ImagesDir: A_MyDocuments . "\AutoHotkey\Lib\Images"
-		, RegistryKey: "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"}
+		, RegistryKey: "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"
+		, AutoHotkeyLibDir : A_MyDocuments . "\AutoHotkey\Lib"}
 }
 
 /**
