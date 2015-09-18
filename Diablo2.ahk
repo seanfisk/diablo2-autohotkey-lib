@@ -26,29 +26,41 @@ CoordMode, Mouse, Client
  * calling any other Diablo2 functions!
  *
  * Arguments:
- * KeysConfigFilePath
- *     A path to a JSON config file containing key mappings.
- * SkillWeaponSetConfigFilePath
- *     A path to a JSON config file containing weapon set preferences for each skill.
- *     Pass this as "" to disable skill/weapon set association.
- * Fullscreen
- *     Pass this as true to indicate you are playing in fullscreen mode. Pass as false to indicate
- *     windowed mode. This is used to determine which technique by which to retrieve the contents
- *     of the screen for filling potions.
+ * KeysConfigPath
+ *     Path to JSON config file containing key mappings
+ * SkillsConfigPath
+ *     Path to JSON config file containing weapon set preferences for each skill. Pass as "" to
+ *     disable.
+ * FillPotionConfigPath
+ *     Path to JSON config file for fill potion. Pass as "" to disable.
+ * LogPath
+ *     Path to log file to create. Pass as "" to disable logging.
  *
  * Return value: None
  */
-Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionConfigFilePath := "", LogPath := "") {
+Diablo2_Init(KeysConfigPath, SkillsConfigPath := "", FillPotionConfigPath := "", LogPath := "") {
 	Diablo2_InitConstants()
 	global Diablo2
 
+	Diablo2.ConfigFiles := {Keys: KeysConfigPath, Skills: SkillsConfigPath, FillPotion: FillPotionConfigPath}
 	Diablo2["Log", "Path"] := LogPath
+	Diablo2_Reinit()
+}
+
+/**
+ * Re-read the configuration files passed to Diablo2_Init().
+ *
+ * Return value: None
+ */
+Diablo2_Reinit() {
+	global Diablo2
+
 	Diablo2.Log.Sep := "|"
-	if (LogPath == "") {
+	if (Diablo2.Log.Path == "") {
 		Diablo2.Log.Func := Func("")
 	}
 	else {
-		Diablo2.Log.FileObj := FileOpen(LogPath, "a")
+		Diablo2.Log.FileObj := FileOpen(Diablo2.Log.Path, "a")
 		; Separate this session from the last with a newline
 		Diablo2.Log.FileObj.Write("`r`n")
 		Diablo2.Log.Func := Func("Diablo2_Private_DoLogMessage")
@@ -56,18 +68,18 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 	Diablo2_LogMessage("Diablo2 AHK library initialized")
 
 	; Configuration
-	Diablo2.Keys := Diablo2_Private_SafeParseJSONFile(KeysConfigFilePath)
+	Diablo2.Keys := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Keys)
 
 	; Set up keyboard mappings
 	Hotkey, IfWinActive, % Diablo2.HotkeyCondition
 
-	if (SkillWeaponSetConfigFilePath != "") {
+	if (Diablo2.ConfigFiles.Skills != "") {
 		Diablo2.Skills := {Max: 16
 		, WeaponSetForKey: {}
 		, SwapKey: Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Swap Weapons"])}
 
 		; Read the config file and assign hotkeys
-		WeaponSetForSkill := Diablo2_Private_SafeParseJSONFile(SkillWeaponSetConfigFilePath)
+		WeaponSetForSkill := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Skills)
 		Loop, % Diablo2.Skills.Max {
 			Key := Diablo2.Keys.Skills[A_Index]
 			if (Key != "") {
@@ -81,9 +93,10 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 		Diablo2.Skills.Current := {WeaponSet: 1, Skills: ["", ""]}
 	}
 
-	if (FillPotionConfigFilePath != "") {
+	EnableFillPotion := true
+	if (Diablo2.ConfigFiles.FillPotion != "") {
 		; Read the config file
-		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(FillPotionConfigFilePath)
+		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.FillPotion)
 
 		; Prepare potion structures
 		for _, Type_ in ["Healing", "Mana"] {
@@ -118,16 +131,23 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 			}
 			OnExit("Diablo2_Private_Shutdown")
 
-			; Cache needle bitmaps
-			For Type_, Sizes in Diablo2.FillPotion.Potions {
-				For _, Size in Sizes {
-					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Diablo2_Private_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
-				}
-			}
-
 			; Find installation directory
 			RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
 			Diablo2.InstallPath := InstallPath
+
+			; Cache needle bitmaps
+			BitmapLoop:
+			For Type_, Sizes in Diablo2.FillPotion.Potions {
+				For _, Size in Sizes {
+					Bitmap := Gdip_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
+					if (Bitmap <= 0) {
+						Diablo2_Private_FillPotionLog("Needle bitmaps not found; please generate them first")
+						EnableFillPotion := false
+						break, BitmapLoop
+					}
+					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Bitmap
+				}
+			}
 		}
 		else {
 			; Compensate for incorrect coordinates in windowed mode
@@ -138,9 +158,14 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 
 		; Assign function
 		Diablo2.FillPotion.Function := Func(Diablo2.FillPotion.Fullscreen ? "Diablo2_Private_FillPotionFullscreenBegin" : "Diablo2_Private_FillPotionWindowed")
-
+	}
+	if (EnableFillPotion) {
 		; Assign hotkey
 		Hotkey, % Diablo2.FillPotion.Key, FillPotionHotkeyActivated
+		Diablo2_Private_FillPotionLog("Enabled")
+	}
+	else {
+		Diablo2_Private_FillPotionLog("Disabled for now")
 	}
 
 	; Turn off context-sensitive hotkey creation.
@@ -156,7 +181,6 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
  Diablo2_InitConstants() {
 	global Diablo2 := {HotkeyCondition: "ahk_classDiablo II"
 		, InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}
-		, ImagesDir: A_MyDocuments . "\AutoHotkey\Lib\Images"
 		, RegistryKey: "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"
 		, AutoHotkeyLibDir : A_MyDocuments . "\AutoHotkey\Lib"}
 }
@@ -260,6 +284,17 @@ Diablo2_OpenInventory() {
 Diablo2_ClearScreen() {
 	global Diablo2
 	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Clear Screen"])
+}
+
+/**
+ * Create needle bitmaps from the contents of the screen.
+ *
+ * Return value: None
+ */
+Diablo2_FillPotionGenerateBitmaps() {
+	Diablo2_OpenInventory()
+	Sleep, 100 ; Wait for the inventory to appear
+	Diablo2_Private_FillPotionFullscreenTakeScreenshot("Diablo2_Private_FillPotionGenerateBitmaps")
 }
 
 /**************************************************************************************************
@@ -413,6 +448,23 @@ Diablo2_Private_ActivateSkill(Key) {
 }
 
 /**
+ * Write needle bitmaps from a taken screenshot.
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
+	global Diablo2
+	ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
+	RunWait, powershell -NoLogo -NonInteractive -NoProfile -File "%ScriptPath%" "%ScreenshotPath%", %A_ScriptDir%
+	if (ErrorLevel != 0) {
+		Diablo2_Fatal("Generating fill potion bitmaps failed with exit code " . ErrorLevel)
+	}
+	Diablo2_LogMessage("Successfully generated fill potion needle bitmaps")
+	WatchDirectory("") ; Stop watching directories
+	Diablo2_Reinit()
+}
+
+/**
  * Call the configured fill potion function.
  *
  * Return value: None
@@ -436,7 +488,7 @@ Diablo2_Private_FillPotionActivated() {
  */
 Diablo2_Private_FillPotionImagePath(Type_, Size) {
 	global Diablo2
-	return Format("{1}\{2}\{3}.png", Diablo2.ImagesDir, Type_, Size)
+	return Format("{1}\Images\{2}\{3}.png", A_ScriptDir, Type_, Size)
 }
 
 /**
@@ -531,7 +583,26 @@ Diablo2_Private_FillPotionWindowed() {
 }
 
 /**
- * Watch the Diablo II installation directory for new screenshots.
+ * Take a screenshot and watch the Diablo II installation directory for it.
+ *
+ * Arguments:
+ * Func
+ *     Name of callback function (as string)
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionFullscreenTakeScreenshot(CallbackName) {
+	global Diablo2
+
+	; Note: InstallPath has a trailing slash
+	; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a screenshot.
+	; Triple question marks ("???") don't seem to work, but "*" should be fine.
+	WatchDirectory(Diablo2.InstallPath . "|Screenshot*.jpg", Func(CallbackName), 0x10)
+	Send, % Diablo2.FillPotion.ScreenShotKey
+}
+
+/**
+ * Fill the potion belt in fullscreen mode.
  *
  * Return value: None
  */
@@ -543,12 +614,8 @@ Diablo2_Private_FillPotionFullscreenBegin() {
 		Diablo2.FillPotion["State", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
 	}
 	Diablo2_Private_FillPotionBegin()
-	; Note: InstallPath has a trailing slash
-	; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a screenshot.
-	; Triple question marks ("???") don't seem to work, but "*" should be fine.
-	WatchDirectory(Diablo2.InstallPath . "|Screenshot*.jpg", Func("Diablo2_Private_FillPotionFullscreen"), 0x10)
 	Sleep, 100 ; Wait for the inventory to appear
-	Send, % Diablo2.FillPotion.ScreenShotKey
+	Diablo2_Private_FillPotionFullscreenTakeScreenshot("Diablo2_Private_FillPotionFullscreen")
 }
 
 /**
@@ -591,7 +658,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 				, CoordsListString
 				, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y
 				, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y
-				, 80 ; Variation; determined emperically
+				, 50 ; Variation; determined emperically
 				; These two blank parameters are transparency color and search direction.
 				, ,
 				; For the number of instances to find, pass one more than the user requested so that we

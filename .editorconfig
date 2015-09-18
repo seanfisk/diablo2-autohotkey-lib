@@ -7,7 +7,7 @@ root = true
 trim_trailing_whitespace = true
 insert_final_newline = true
 
-[*.ahk]
+[*.{ahk,ps1}]
 indent_style = tab
 indent_size = 2
 # See http://ahkscript.org/docs/Scripts.htm#cp
