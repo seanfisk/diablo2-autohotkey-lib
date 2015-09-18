@@ -121,7 +121,7 @@ Diablo2_Init(KeysConfigFilePath, SkillWeaponSetConfigFilePath := "", FillPotionC
 			; Cache needle bitmaps
 			For Type_, Sizes in Diablo2.FillPotion.Potions {
 				For _, Size in Sizes {
-					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Gdip_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
+					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Diablo2_Private_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
 				}
 			}
 
@@ -305,6 +305,24 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
 	; order they were declared.
 	; This is important for the key bindings, where the order does matter.
 	return JSON.Load(FileContents, true)
+}
+
+/**
+ * Safely create a bitmap from a file.
+ *
+ * Arguments:
+ * FilePath
+ *     Path to image file.
+ *
+ * Return value: The created bitmap
+ */
+Diablo2_Private_CreateBitmapFromFile(FilePath) {
+	global Diablo2
+	Bitmap := Gdip_CreateBitmapFromFile(FilePath)
+	if (Bitmap <= 0) {
+		Diablo2_Fatal("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
+	}
+	return Bitmap
 }
 
 /**
@@ -553,7 +571,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 
 	; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the bugs. w and h are supposed (?) to represent width and height; they are used as such in the AHK code but not the C code. This causes problems and an inability to find the needle. We are now using MasterFocus' Gdip_ImageSearch, which works well.
 	; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
-	HaystackBitmap := Gdip_CreateBitmapFromFile(HaystackPath)
+	HaystackBitmap := Diablo2_Private_CreateBitmapFromFile(HaystackPath)
 	; Assume we are finished for now; invalidate later if we are not.
 	Finished := true
 
