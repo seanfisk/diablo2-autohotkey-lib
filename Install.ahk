@@ -2,9 +2,9 @@
 #Warn  ; Enable warnings to assist with detecting common errors.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 
-#Include Diablo2.ahk
+; Don't include Diablo2.ahk in here; if Diablo2.ahk has errors AHK will try to include the Lib version.
 
-Diablo2_InitConstants()
+AutoHotkeyLibDir := A_MyDocuments . "\AutoHotkey\Lib"
 RegRead, Ahk2ExePath, HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Ahk2Exe.exe ; Get default value
 
 Fail(Message) {
@@ -13,16 +13,16 @@ Fail(Message) {
 }
 
 InstallFile(SourcePath) {
-	global Diablo2
+	global AutoHotkeyLibDir
 	if (!FileExist(SourcePath)) {
 		Fail(Format("{}: File to install does not exist", SourcePath))
 	}
-	FileCopy, %SourcePath%, % Diablo2.AutoHotkeyLibDir , true
+	FileCopy, %SourcePath%, %AutoHotkeyLibDir%, true
 }
 
 ; Install the Diablo2 library and its dependencies to the AutoHotkey user library location.
 
-FileCreateDir, % Diablo2.AutoHotkeyLibDir
+FileCreateDir, %AutoHotkeyLibDir%
 InstallFile("Diablo2.ahk")
 InstallFile("Vendor\JSON\JSON.ahk")
 InstallFile("Vendor\WatchDirectory\WatchDirectory.ahk")
@@ -36,10 +36,10 @@ InstallFile("Vendor\Gdip_ImageSearch.ahk")
 InstallFile("GenerateBitmaps.ps1")
 
 ; Compile after installing, as RunGame.ahk makes use of Diablo2.ahk.
-ExePath := Diablo2.AutoHotkeyLibDir . "\Diablo II.exe"
+ExePath := AutoHotkeyLibDir . "\Diablo II.exe"
 RunWait, "%Ahk2ExePath%" /in RunGame.ahk /out "%ExePath%" /icon Game.ico
 if (ErrorLevel != 0) {
 	Fail("Running Ahk2Exe failed with return code " . ErrorLevel)
 }
 
-MsgBox, % Format("Install successful!`n`nInstalled to {}.", Diablo2.AutoHotkeyLibDir)
+MsgBox, % Format("Install successful!`n`nInstalled to {}.", AutoHotkeyLibDir)
