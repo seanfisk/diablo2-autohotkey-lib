@@ -44,15 +44,16 @@ Diablo2_Init(KeysConfigPath, SkillsConfigPath := "", FillPotionConfigPath := "",
 
 	Diablo2.ConfigFiles := {Keys: KeysConfigPath, Skills: SkillsConfigPath, FillPotion: FillPotionConfigPath}
 	Diablo2["Log", "Path"] := LogPath
-	Diablo2_Reinit()
+	Diablo2_Reset()
 }
 
 /**
- * Re-read the configuration files passed to Diablo2_Init().
+ * Reset the macros by re-reading the configuration files passed to Diablo2_Init() and resetting
+ * internal macro structures.
  *
  * Return value: None
  */
-Diablo2_Reinit() {
+Diablo2_Reset() {
 	global Diablo2
 
 	Diablo2.Log.Sep := "|"
@@ -495,7 +496,7 @@ Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 	}
 	Diablo2_LogMessage("Successfully generated fill potion needle bitmaps")
 	WatchDirectory("") ; Stop watching directories
-	Diablo2_Reinit()
+	Diablo2_Reset()
 }
 
 /**
