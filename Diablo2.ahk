@@ -76,7 +76,7 @@ Diablo2_Reinit() {
 	if (Diablo2.ConfigFiles.Skills != "") {
 		Diablo2.Skills := {Max: 16
 		, WeaponSetForKey: {}
-		, SwapKey: Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Swap Weapons"])}
+		, SwapKey: Diablo2_Private_RequireKey("Swap Weapons", "Skills")}
 
 		; Read the config file and assign hotkeys
 		WeaponSetForSkill := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Skills)
@@ -91,10 +91,16 @@ Diablo2_Reinit() {
 
 		; Macro state
 		Diablo2.Skills.Current := {WeaponSet: 1, Skills: ["", ""]}
+
+		Diablo2_Private_SkillsLog("Enabled")
 	}
 
 	EnableFillPotion := true
 	if (Diablo2.ConfigFiles.FillPotion != "") {
+		for _, KeyName in ["Inventory Screen", "Clear Screen"] {
+			Diablo2_Private_RequireKey(KeyName, "FillPotion")
+		}
+
 		; Read the config file
 		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.FillPotion)
 
@@ -117,12 +123,7 @@ Diablo2_Reinit() {
 		}
 
 		if (Diablo2.FillPotion.Fullscreen) {
-			; Ensure Screen Shot key is assigned
-			ScreenShotKey := Diablo2.Keys["Screen Shot"]
-			if (ScreenShotKey == "") {
-				Diablo2_Fatal("Screen Shot key is not assigned; cannot capture screen")
-			}
-			Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_HotkeySyntaxToSendSyntax(ScreenShotKey)
+			Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireKey("Screen Shot", "FillPotion")
 
 			; Start GDI+ for full screen
 			Diablo2.GdipToken := Gdip_Startup()
@@ -246,6 +247,9 @@ Diablo2_StartGame() {
  */
 Diablo2_SetKeyBindings() {
 	global Diablo2
+
+	Diablo2_LogMessage("Assigning keys")
+
 	; Suspend all hotkeys while assigning key bindings.
 	Suspend On
 
@@ -264,6 +268,8 @@ Diablo2_SetKeyBindings() {
 
 	; Turn hotkeys back on.
 	Suspend Off
+
+	Diablo2_LogMessage("Keys assigned")
 }
 
 /**
@@ -300,6 +306,28 @@ Diablo2_FillPotionGenerateBitmaps() {
 /**************************************************************************************************
  * BEGIN PRIVATE FUNCTIONS
  */
+
+/**
+ * Check to make sure a key is assigned, exiting with an error if not. The key is returned in Send
+ * syntax.
+ *
+ * Arguments:
+ * KeyName
+ *     Name of the key
+ * Feature
+ *     Feature for which the key is needed
+ *
+ * Return value: Key in Send syntax
+ */
+Diablo2_Private_RequireKey(KeyName, Feature) {
+	global Diablo2
+
+	Key := Diablo2.Keys[KeyName]
+	if (Key == "") {
+		Diablo2_Fatal(Format("Key assignment for {} is required for {}", KeyName, Feature))
+	}
+	return Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
+}
 
 /**
  * Perform logging of a message.
@@ -407,6 +435,11 @@ Diablo2_Private_AssignKeyAndAdvance(KeyString) {
 	Send, {Down}
 }
 
+Diablo2_Private_SkillsLog(Message) {
+	global Diablo2
+	Diablo2_LogMessage("Skills" . Diablo2.Log.Sep . Message)
+}
+
 /**
  * Activate the skill indicated by the hotkey pressed.
  *
@@ -419,25 +452,26 @@ Diablo2_Private_AssignKeyAndAdvance(KeyString) {
 Diablo2_Private_ActivateSkill(Key) {
 	global Diablo2
 	PreferredWeaponSet := Diablo2.Skills.WeaponSetForKey[Key]
-	SwitchWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != Diablo2.Skills.Current.WeaponSet)
+	ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != Diablo2.Skills.Current.WeaponSet)
 
 	; Suspend all hotkeys while this stuff is happening.
 	; This decreases the chance of the game and macros getting out-of-sync.
 	Suspend, On
 
-	if (SwitchWeaponSet) {
+	if (ShouldSwapWeaponSet) {
 		; Swap to the other weapon
+		Diablo2_Private_SkillsLog("Swapping to weapon set " . PreferredWeaponSet)
 		Send, % Diablo2.Skills.SwapKey
 		Diablo2.Skills.Current.WeaponSet := PreferredWeaponSet
 	}
 
 	if (Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] != Key) {
-		if (SwitchWeaponSet) {
+		if (ShouldSwapWeaponSet) {
 			; If we just switched weapons, we need to sleep very slightly
 			; while the game actually swaps weapons.
 			Sleep, 70
 		}
-
+		Diablo2_Private_SkillsLog(Format("Switching to skill on '{}'", Key))
 		Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
 
 		Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] := Key
