@@ -495,11 +495,14 @@ Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 	Diablo2_Private_GdipShutdown()
 	Diablo2_Private_FillPotionLog("Running bitmap generation script")
 	ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
-	RunWait, powershell -NoLogo -NonInteractive -NoProfile -File "%ScriptPath%" "%ScreenshotPath%", %A_ScriptDir%, Hide
-	if (ErrorLevel != 0) {
-		Diablo2_Fatal("Needle bitmap generation failed with exit code " . ErrorLevel)
+	; Don't use -File: https://connect.microsoft.com/PowerShell/feedback/details/750653/powershell-exe-doesn-t-return-correct-exit-codes-when-using-the-file-option
+	RunWait, powershell -NoLogo -NonInteractive -NoProfile -Command "& '%ScriptPath%' '%ScreenshotPath%'", %A_ScriptDir%, Hide
+	ScriptExitCode := ErrorLevel
+	Diablo2_Private_FillPotionLog("Bitmap generation finished with exit code " . ScriptExitCode)
+	if (ScriptExitCode != 0) {
+		Diablo2_Fatal("Needle bitmap generated failed")
 	}
-	Diablo2_Private_FillPotionLog("Successfully generated new needle bitmaps")
+	Diablo2_Private_FillPotionLog("Needle bitmap generation succeeded. Resetting...")
 	Diablo2_Reset()
 	Diablo2_ClearScreen()
 }

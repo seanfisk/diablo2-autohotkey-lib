@@ -10,6 +10,9 @@ Param(
 	[string]$ScreenshotPath
 )
 
+# Stop on first error.
+$ErrorActionPreference = 'Stop'
+
 function EnsureDir($Dir) {
 	mkdir $Dir -ErrorAction SilentlyContinue | Out-Null
 	Write-Verbose "Created $dir"
@@ -42,8 +45,14 @@ $Coords['Rejuvenation'] = @{
 Add-Type -AssemblyName System.Drawing
 # .NET doesn't pick up the PowerShell working directory, so pass it an
 # absolute path.
-$ScreenshotAbspath = Resolve-Path $ScreenshotPath
-$ScreenshotBitmap = New-Object System.Drawing.Bitmap($ScreenshotPath)
+$ScreenshotAbspath = (Resolve-Path $ScreenshotPath).Path
+try {
+	$ScreenshotBitmap = New-Object System.Drawing.Bitmap($ScreenshotAbspath)
+}
+catch
+{
+	throw "Could create bitmap from '$ScreenshotAbspath'. Ensure the image exists."
+}
 # Again, we need an absolute path for passing to .NET.
 $ImagesDir = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) Images))
 EnsureDir($ImagesDir)
