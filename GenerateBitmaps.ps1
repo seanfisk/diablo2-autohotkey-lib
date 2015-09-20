@@ -10,6 +10,8 @@ Param(
 	[string]$ScreenshotPath
 )
 
+# Enforce best practices.
+Set-StrictMode -Version Latest
 # Stop on first error.
 $ErrorActionPreference = 'Stop'
 
