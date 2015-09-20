@@ -299,6 +299,7 @@ Diablo2_ClearScreen() {
  * Return value: None
  */
 Diablo2_FillPotionGenerateBitmaps() {
+	Diablo2_Private_FillPotionLog("Generating new needle bitmaps")
 	Diablo2_OpenInventory()
 	Sleep, 100 ; Wait for the inventory to appear
 	Diablo2_Private_FillPotionFullscreenTakeScreenshot("Diablo2_Private_FillPotionGenerateBitmaps")
@@ -489,14 +490,18 @@ Diablo2_Private_ActivateSkill(Key) {
  */
 Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 	global Diablo2
+	; Dispose the bitmaps so that our PowerShell script can access those paths. The bitmaps will
+	; be re-created when calling Diablo2_Reset().
+	Diablo2_Private_GdipShutdown()
+	Diablo2_Private_FillPotionLog("Running bitmap generation script")
 	ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
-	RunWait, powershell -NoLogo -NonInteractive -NoProfile -File "%ScriptPath%" "%ScreenshotPath%", %A_ScriptDir%
+	RunWait, powershell -NoLogo -NonInteractive -NoProfile -File "%ScriptPath%" "%ScreenshotPath%", %A_ScriptDir%, Hide
 	if (ErrorLevel != 0) {
-		Diablo2_Fatal("Generating fill potion bitmaps failed with exit code " . ErrorLevel)
+		Diablo2_Fatal("Needle bitmap generation failed with exit code " . ErrorLevel)
 	}
-	Diablo2_LogMessage("Successfully generated fill potion needle bitmaps")
-	WatchDirectory("") ; Stop watching directories
+	Diablo2_Private_FillPotionLog("Successfully generated new needle bitmaps")
 	Diablo2_Reset()
+	Diablo2_ClearScreen()
 }
 
 /**
@@ -785,19 +790,30 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 }
 
 /**
- * Perform shutdown tasks. Only needed for FillPotion Fullscreen mode.
+ * Dispose images and shut down GDI+.
  *
  * Return value: None
  */
-Diablo2_Private_Shutdown() {
+Diablo2_Private_GdipShutdown() {
 	global Diablo2
-	WatchDirectory("") ; Stop watching all directories
 	For Type_, Sizes in Diablo2.FillPotion.NeedleBitmaps {
 		For _, Bitmap in Sizes {
 			Gdip_DisposeImage(Bitmap)
 		}
 	}
 	Gdip_Shutdown(Diablo2.GdipToken)
+}
+
+/**
+ * Perform shutdown tasks. Only needed for FillPotion Fullscreen mode.
+ *
+ * Return value: None
+ */
+Diablo2_Private_Shutdown() {
+	global Diablo2
+	Diablo2_LogMessage("Shutting down")
+	WatchDirectory("") ; Stop watching all directories
+	Diablo2_Private_GdipShutdown()
 	if (Diablo2.Log.HasKey("FileObj")) {
 		Diablo2.Log.FileObj.Close()
 	}
