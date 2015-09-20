@@ -14,7 +14,10 @@ Param(
 $ErrorActionPreference = 'Stop'
 
 function EnsureDir($Dir) {
-	mkdir $Dir -ErrorAction SilentlyContinue | Out-Null
+	if (Test-Path -LiteralPath $Dir -PathType Container) {
+		return
+	}
+	mkdir $Dir | Out-Null
 	Write-Verbose "Created $dir"
 }
 
