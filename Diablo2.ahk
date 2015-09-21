@@ -1,9 +1,5 @@
 #NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
 ; Don't warn; libraries we include have too many errors :|
-SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
-; IMPORTANT: Needed in windowed mode to find the correct coordinates.
-CoordMode, Pixel, Client
-CoordMode, Mouse, Client
 
 ; Each key binding is given in AutoHotkey syntax.
 ; See <http://ahkscript.org/docs/KeyList.htm>
@@ -105,6 +101,13 @@ Diablo2_Reset() {
 		; Read the config file
 		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.FillPotion)
 
+		; We use screen shots in both windowed and fullscreen to generate
+		; bitmaps, so we need the key and installation path for both.
+		Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireKey("Screen Shot", "FillPotion")
+		; Find installation directory
+		RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
+		Diablo2.InstallPath := InstallPath
+
 		; Prepare potion structures
 		for _, Type_ in ["Healing", "Mana"] {
 			Diablo2.FillPotion.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
@@ -124,18 +127,11 @@ Diablo2_Reset() {
 		}
 
 		if (Diablo2.FillPotion.Fullscreen) {
-			Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireKey("Screen Shot", "FillPotion")
-
 			; Start GDI+ for full screen
 			Diablo2.GdipToken := Gdip_Startup()
 			if (!Diablo2.GdipToken) {
 				Diablo2_Fatal("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AHK")
 			}
-			OnExit("Diablo2_Private_Shutdown")
-
-			; Find installation directory
-			RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
-			Diablo2.InstallPath := InstallPath
 
 			; Cache needle bitmaps
 			BitmapLoop:
@@ -149,12 +145,6 @@ Diablo2_Reset() {
 					}
 					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Bitmap
 				}
-			}
-		}
-		else {
-			; Compensate for incorrect coordinates in windowed mode
-			For Location in Diablo2.InventoryCoords {
-				Diablo2.InventoryCoords[Location].Y += 25
 			}
 		}
 
@@ -172,6 +162,9 @@ Diablo2_Reset() {
 
 	; Turn off context-sensitive hotkey creation.
 	Hotkey, IfWinActive
+
+	; Set shutdown function
+	OnExit("Diablo2_Private_Shutdown")
 }
 
 /**
@@ -280,7 +273,7 @@ Diablo2_SetKeyBindings() {
  */
 Diablo2_OpenInventory() {
 	global Diablo2
-	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Inventory Screen"])
+	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Inventory Screen"]))
 }
 
 /**
@@ -290,7 +283,7 @@ Diablo2_OpenInventory() {
  */
 Diablo2_ClearScreen() {
 	global Diablo2
-	Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Clear Screen"])
+	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Clear Screen"]))
 }
 
 /**
@@ -302,7 +295,21 @@ Diablo2_FillPotionGenerateBitmaps() {
 	Diablo2_Private_FillPotionLog("Generating new needle bitmaps")
 	Diablo2_OpenInventory()
 	Sleep, 100 ; Wait for the inventory to appear
-	Diablo2_Private_FillPotionFullscreenTakeScreenshot("Diablo2_Private_FillPotionGenerateBitmaps")
+	Diablo2_Private_FillPotionTakeScreenshot("Diablo2_Private_FillPotionGenerateBitmaps")
+}
+
+/**
+ * Send keys or clicks in our specific format.
+ *
+ * Arguments:
+ * Keys
+ *     Sequence of keys to send
+ */
+Diablo2_Send(Keys) {
+	; Always use SendInput; it works well with Diablo II. We use this
+	; instead of SendMode because settings with SendMode get reset for
+	; each new thread.
+  SendInput, %Keys%
 }
 
 /**************************************************************************************************
@@ -429,12 +436,12 @@ Diablo2_Private_Min(A, B) {
 Diablo2_Private_AssignKeyAndAdvance(KeyString) {
 	global Diablo2
 	if (KeyString == "") {
-		Send, {Delete}
+		Diablo2_Send("{Delete}")
 	}
 	else {
-		Send, % "{Enter}" Diablo2_Private_HotkeySyntaxToSendSyntax(KeyString)
+		Diablo2_Send("{Enter}" . Diablo2_Private_HotkeySyntaxToSendSyntax(KeyString))
 	}
-	Send, {Down}
+	Diablo2_Send("{Down}")
 }
 
 Diablo2_Private_SkillsLog(Message) {
@@ -463,7 +470,7 @@ Diablo2_Private_ActivateSkill(Key) {
 	if (ShouldSwapWeaponSet) {
 		; Swap to the other weapon
 		Diablo2_Private_SkillsLog("Swapping to weapon set " . PreferredWeaponSet)
-		Send, % Diablo2.Skills.SwapKey
+		Diablo2_Send(Diablo2.Skills.SwapKey)
 		Diablo2.Skills.Current.WeaponSet := PreferredWeaponSet
 	}
 
@@ -474,7 +481,7 @@ Diablo2_Private_ActivateSkill(Key) {
 			Sleep, 70
 		}
 		Diablo2_Private_SkillsLog(Format("Switching to skill on '{}'", Key))
-		Send, % Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
+		Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Key))
 
 		Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] := Key
 	}
@@ -490,18 +497,29 @@ Diablo2_Private_ActivateSkill(Key) {
  */
 Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 	global Diablo2
-	; Dispose the bitmaps so that our PowerShell script can access those paths. The bitmaps will
-	; be re-created when calling Diablo2_Reset().
+
+	Diablo2_Private_StopWatchDirectory()
+	; If we are in fullscreen, dispose the bitmaps so that our
+	; PowerShell script can access those paths. The bitmaps will be
+	; re-created when calling Diablo2_Reset(). If we are in windowed
+	; mode, this is a no-op.
 	Diablo2_Private_GdipShutdown()
 	Diablo2_Private_FillPotionLog("Running bitmap generation script")
 	ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
 	; Don't use -File: https://connect.microsoft.com/PowerShell/feedback/details/750653/powershell-exe-doesn-t-return-correct-exit-codes-when-using-the-file-option
 	RunWait, powershell -NoLogo -NonInteractive -NoProfile -Command "& '%ScriptPath%' '%ScreenshotPath%'", %A_ScriptDir%, Hide
 	ScriptExitCode := ErrorLevel
+
+	; Remove the screen shot; it is not needed any more.
+	FileDelete, %ScreenshotPath%
+
+	; Check for success
 	Diablo2_Private_FillPotionLog("Bitmap generation finished with exit code " . ScriptExitCode)
 	if (ScriptExitCode != 0) {
 		Diablo2_Fatal("Needle bitmap generated failed")
 	}
+
+	; Reset
 	Diablo2_Private_FillPotionLog("Needle bitmap generation succeeded. Resetting...")
 	Diablo2_Reset()
 	Diablo2_ClearScreen()
@@ -541,7 +559,7 @@ Diablo2_Private_FillPotionImagePath(Type_, Size) {
  */
 Diablo2_Private_FillPotionBegin() {
 	Diablo2_OpenInventory()
-	Send, {Shift down}
+	Diablo2_Send("{Shift down}")
 }
 
 /**
@@ -562,7 +580,7 @@ Diablo2_Private_FillPotionClick(X, Y) {
 	Click, %X%, %Y%
 	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
-		Send, {LButton down}
+		Diablo2_Send("{LButton down}")
 	}
 	Sleep, 150
 }
@@ -573,7 +591,8 @@ Diablo2_Private_FillPotionClick(X, Y) {
  * Return value: None
  */
 Diablo2_Private_FillPotionEnd() {
-	Send, {Shift up}
+	Diablo2_Private_FillPotionLog("Finishing run")
+	Diablo2_Send("{Shift up}")
 	Diablo2_ClearScreen()
 }
 
@@ -600,6 +619,11 @@ Diablo2_Private_FillPotionLogSize(Type_, Size, Message) {
 Diablo2_Private_FillPotionWindowed() {
 	global Diablo2
 
+	; Reset CoordMode for this thread.
+	for _, Category in ["Pixel", "Mouse"] {
+		CoordMode, %Category%, Client
+	}
+
 	Diablo2_Private_FillPotionBegin()
 	for Type_, Sizes in Diablo2.FillPotion.Potions {
 		LastPotion := {X: -1, Y: -1}
@@ -615,11 +639,16 @@ Diablo2_Private_FillPotionWindowed() {
 					break ; Image not found on the screen.
 				}
 				if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
-					break, WindowedSizeLoop ; Potion belt is full of potions of this type.
+					Diablo2_Private_FillPotionLogType(Type_, "Finished for run due to full belt")
+					break, WindowedSizeLoop
 				}
+				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", PotionX, PotionY))
 				Diablo2_Private_FillPotionClick(PotionX, PotionY)
 				LastPotion := {X: PotionX, Y: PotionY}
 			}
+		}
+		if (LastPotion.X == -1) {
+			Diablo2_Private_FillPotionLogType(Type_, "Finished because no potions left")
 		}
 	}
 	Diablo2_Private_FillPotionEnd()
@@ -634,14 +663,14 @@ Diablo2_Private_FillPotionWindowed() {
  *
  * Return value: None
  */
-Diablo2_Private_FillPotionFullscreenTakeScreenshot(CallbackName) {
+Diablo2_Private_FillPotionTakeScreenshot(CallbackName) {
 	global Diablo2
 
 	; Note: InstallPath has a trailing slash
 	; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a screenshot.
 	; Triple question marks ("???") don't seem to work, but "*" should be fine.
 	WatchDirectory(Diablo2.InstallPath . "|Screenshot*.jpg", Func(CallbackName), 0x10)
-	Send, % Diablo2.FillPotion.ScreenShotKey
+	Diablo2_Send(Diablo2.FillPotion.ScreenShotKey)
 }
 
 /**
@@ -658,7 +687,7 @@ Diablo2_Private_FillPotionFullscreenBegin() {
 	}
 	Diablo2_Private_FillPotionBegin()
 	Sleep, 100 ; Wait for the inventory to appear
-	Diablo2_Private_FillPotionFullscreenTakeScreenshot("Diablo2_Private_FillPotionFullscreen")
+	Diablo2_Private_FillPotionTakeScreenshot("Diablo2_Private_FillPotionFullscreen")
 }
 
 /**
@@ -778,8 +807,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 		}
 	}
 	if (Finished) {
-		Diablo2_Private_FillPotionLog("Finishing run")
-		WatchDirectory("") ; Stop watching directories
+		Diablo2_Private_StopWatchDirectory()
 		Diablo2_Private_FillPotionEnd()
 	}
 	else {
@@ -788,8 +816,17 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 		; Sleep, 100
 
 		; Get the next screenshot
-		Send, % Diablo2.FillPotion.ScreenShotKey
+		Diablo2_Send(Diablo2.FillPotion.ScreenShotKey)
 	}
+}
+
+/**
+ * Stop watching for new screenshots.
+ *
+ * Return value: None
+ */
+Diablo2_Private_StopWatchDirectory() {
+	WatchDirectory("")
 }
 
 /**
@@ -799,12 +836,14 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
  */
 Diablo2_Private_GdipShutdown() {
 	global Diablo2
-	For Type_, Sizes in Diablo2.FillPotion.NeedleBitmaps {
-		For _, Bitmap in Sizes {
-			Gdip_DisposeImage(Bitmap)
+	if (Diablo2.HasKey("GdipToken")) {
+		For Type_, Sizes in Diablo2.FillPotion.NeedleBitmaps {
+			For _, Bitmap in Sizes {
+				Gdip_DisposeImage(Bitmap)
+			}
 		}
+		Gdip_Shutdown(Diablo2.GdipToken)
 	}
-	Gdip_Shutdown(Diablo2.GdipToken)
 }
 
 /**
@@ -815,9 +854,11 @@ Diablo2_Private_GdipShutdown() {
 Diablo2_Private_Shutdown() {
 	global Diablo2
 	Diablo2_LogMessage("Shutting down")
-	WatchDirectory("") ; Stop watching all directories
+	Diablo2_LogMessage("Stopping directory watches")
+	Diablo2_Private_StopWatchDirectory()
 	Diablo2_Private_GdipShutdown()
 	if (Diablo2.Log.HasKey("FileObj")) {
+		Diablo2_LogMessage("Closing log")
 		Diablo2.Log.FileObj.Close()
 	}
 }
