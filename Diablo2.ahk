@@ -67,13 +67,13 @@ Diablo2_Reset() {
 	; Configuration
 	Diablo2.Keys := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Keys)
 
-	; Set up keyboard mappings
-	Hotkey, IfWinActive, % Diablo2.HotkeyCondition
-
 	if (Diablo2.ConfigFiles.Skills != "") {
 		Diablo2.Skills := {Max: 16
 		, WeaponSetForKey: {}
 		, SwapKey: Diablo2_Private_RequireKey("Swap Weapons", "Skills")}
+
+		; Turn on context-sensitive hotkey creation
+		Hotkey, IfWinActive, % Diablo2.HotkeyCondition
 
 		; Read the config file and assign hotkeys
 		WeaponSetForSkill := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Skills)
@@ -85,6 +85,9 @@ Diablo2_Reset() {
 				Hotkey, %Key%, SkillHotkeyActivated
 			}
 		}
+
+		; Turn off context-sensitivity
+		Hotkey, IfWinActive
 
 		; Macro state
 		Diablo2.Skills.Current := {WeaponSet: 1, Skills: ["", ""]}
@@ -158,16 +161,11 @@ Diablo2_Reset() {
 		Diablo2.FillPotion.Function := Func(Diablo2.FillPotion.Fullscreen ? "Diablo2_Private_FillPotionFullscreenBegin" : "Diablo2_Private_FillPotionWindowed")
 	}
 	if (EnableFillPotion) {
-		; Assign hotkey
-		Hotkey, % Diablo2.FillPotion.Key, FillPotionHotkeyActivated
 		Diablo2_Private_FillPotionLog("Enabled")
 	}
 	else {
 		Diablo2_Private_FillPotionLog("Disabled for now")
 	}
-
-	; Turn off context-sensitive hotkey creation.
-	Hotkey, IfWinActive
 
 	; Set shutdown function
 	OnExit("Diablo2_Private_Shutdown")
@@ -289,6 +287,17 @@ Diablo2_OpenInventory() {
 Diablo2_ClearScreen() {
 	global Diablo2
 	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Clear Screen"]))
+}
+
+/**
+ * Fill the potion belt.
+ *
+ * Return value: None
+ */
+Diablo2_FillPotion() {
+	global Diablo2
+	Diablo2_Private_FillPotionLog("Starting run")
+	Diablo2.FillPotion.Function.Call()
 }
 
 /**
@@ -528,17 +537,6 @@ Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 	Diablo2_Private_FillPotionLog("Needle bitmap generation succeeded. Resetting...")
 	Diablo2_Reset()
 	Diablo2_ClearScreen()
-}
-
-/**
- * Call the configured fill potion function.
- *
- * Return value: None
- */
-Diablo2_Private_FillPotionActivated() {
-	global Diablo2
-	Diablo2_Private_FillPotionLog("Starting run")
-	Diablo2.FillPotion.Function.Call()
 }
 
 /**
@@ -873,11 +871,6 @@ goto, End
 ; Handle all skill hotkeys with a preferred weapon set.
 SkillHotkeyActivated:
 Diablo2_Private_ActivateSkill(A_ThisHotkey)
-return
-
-; Handle fill potion hotkey
-FillPotionHotkeyActivated:
-Diablo2_Private_FillPotionActivated()
 return
 
 End:
