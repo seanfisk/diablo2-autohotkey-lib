@@ -22,8 +22,8 @@
  * calling any other Diablo2 functions!
  *
  * Arguments:
- * KeysConfigPath
- *     Path to JSON config file containing key mappings
+ * ControlsConfigPath
+ *     Path to JSON config file containing key bindings. This is required.
  * SkillsConfigPath
  *     Path to JSON config file containing weapon set preferences for each skill. Pass as "" to
  *     disable.
@@ -34,11 +34,11 @@
  *
  * Return value: None
  */
-Diablo2_Init(KeysConfigPath, SkillsConfigPath := "", FillPotionConfigPath := "", LogPath := "") {
+Diablo2_Init(ControlsConfigPath, SkillsConfigPath := "", FillPotionConfigPath := "", LogPath := "") {
 	Diablo2_InitConstants()
 	global Diablo2
 
-	Diablo2.ConfigFiles := {Keys: KeysConfigPath, Skills: SkillsConfigPath, FillPotion: FillPotionConfigPath}
+	Diablo2.ConfigFiles := {Controls: ControlsConfigPath, Skills: SkillsConfigPath, FillPotion: FillPotionConfigPath}
 	Diablo2["Log", "Path"] := LogPath
 	Diablo2_Reset()
 }
@@ -65,12 +65,12 @@ Diablo2_Reset() {
 	Diablo2_LogMessage("Diablo2 AHK library initialized")
 
 	; Configuration
-	Diablo2.Keys := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Keys)
+	Diablo2.Controls := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Controls)
 
 	if (Diablo2.ConfigFiles.Skills != "") {
 		Diablo2.Skills := {Max: 16
 		, WeaponSetForKey: {}
-		, SwapKey: Diablo2_Private_RequireKey("Swap Weapons", "Skills")}
+		, SwapKey: Diablo2_Private_RequireControl("Swap Weapons", "Skills")}
 
 		; Turn on context-sensitive hotkey creation
 		Hotkey, IfWinActive, % Diablo2.HotkeyCondition
@@ -78,7 +78,7 @@ Diablo2_Reset() {
 		; Read the config file and assign hotkeys
 		WeaponSetForSkill := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Skills)
 		Loop, % Diablo2.Skills.Max {
-			Key := Diablo2.Keys.Skills[A_Index]
+			Key := Diablo2.Controls.Skills[A_Index]
 			if (Key != "") {
 				Diablo2.Skills.WeaponSetForKey[Key] := WeaponSetForSkill[A_Index]
 				; Make each skill a hotkey so we can track the current skill.
@@ -97,8 +97,8 @@ Diablo2_Reset() {
 
 	EnableFillPotion := true
 	if (Diablo2.ConfigFiles.FillPotion != "") {
-		for _, KeyName in ["Inventory Screen", "Clear Screen"] {
-			Diablo2_Private_RequireKey(KeyName, "FillPotion")
+		for _, Function in ["Inventory Screen", "Clear Screen"] {
+			Diablo2_Private_RequireControl(Function, "FillPotion")
 		}
 
 		; Read the config file
@@ -106,7 +106,7 @@ Diablo2_Reset() {
 
 		; We use screen shots in both windowed and fullscreen to generate
 		; bitmaps, so we need the key and installation path for both.
-		Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireKey("Screen Shot", "FillPotion")
+		Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireControl("Screen Shot", "FillPotion")
 		; Find installation directory
 		RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
 		Diablo2.InstallPath := InstallPath
@@ -237,53 +237,53 @@ Diablo2_StartGame() {
 }
 
 /**
- * Set key bindings for the game.
+ * Auto-configure control for the game.
  * To use, assign to a hotkey, visit "Configure Controls" screen, and press the hotkey.
  *
  * Return value: None
  */
-Diablo2_SetKeyBindings() {
+Diablo2_ConfigureControls() {
 	global Diablo2
 
-	Diablo2_LogMessage("Assigning keys")
+	Diablo2_LogMessage("Configuring controls")
 
-	; Suspend all hotkeys while assigning key bindings.
+	; Suspend all hotkeys while assigning controls.
 	Suspend On
 
-	; Flatten the binding list for easier duplicate detection.
-	FlatBindings := []
-	for Function, Value in Diablo2.Keys {
+	; Flatten the control list for easier duplicate detection.
+	FlatControls := []
+	for Function, Value in Diablo2.Controls {
 		if (Function == "Skills" or Function == "Belt") {
-			; Each of these names contain a list of bindings.
+			; Each of these names contain a list of keys.
 			for ListIndex, ListElement in Value {
-				FlatBindings.Push({Function: Format("{} {}", Function, ListIndex), Binding: ListElement})
+				FlatControls.Push({Function: Format("{} {}", Function, ListIndex), Key: ListElement})
 			}
 		}
 		else {
-			FlatBindings.Push({Function: Function, Binding: Value})
+			FlatControls.Push({Function: Function, Key: Value})
 		}
 	}
 
-	BindingFunctions := {}
-	for _, Control_ in FlatBindings {
+	KeyFunctions := {}
+	for _, Control_ in FlatControls {
 		Function := Control_.Function
-		Binding := Control_.Binding
+		Key := Control_.Key
 
 		; If the user passed null in the JSON file, delete the binding.
-		if (Binding == "") {
+		if (Key == "") {
 			Diablo2_Send("{Delete}")
 		}
 		else {
 			; Check for duplicates
-			DuplicateBindingFunction := BindingFunctions[Binding]
-			if (DuplicateBindingFunction != "") {
+			DuplicateKeyFunction := KeyFunctions[Key]
+			if (DuplicateKeyFunction != "") {
 				Diablo2_Fatal(Format("Duplicate key binding '{}' for '{}' and '{}'"
-					, Binding, DuplicateBindingFunction, Function))
+					, Key, DuplicateKeyFunction, Function))
 			}
-			BindingFunctions[Binding] := Function
+			KeyFunctions[Key] := Function
 
 			; Assign the key binding
-			Diablo2_Send("{Enter}" . Diablo2_Private_HotkeySyntaxToSendSyntax(Binding))
+			Diablo2_Send("{Enter}" . Diablo2_Private_HotkeySyntaxToSendSyntax(Key))
 		}
 		Diablo2_Send("{Down}")
 	}
@@ -291,7 +291,7 @@ Diablo2_SetKeyBindings() {
 	; Turn hotkeys back on.
 	Suspend Off
 
-	Diablo2_LogMessage("Keys assigned")
+	Diablo2_LogMessage("Controls assigned")
 }
 
 /**
@@ -301,7 +301,7 @@ Diablo2_SetKeyBindings() {
  */
 Diablo2_OpenInventory() {
 	global Diablo2
-	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Inventory Screen"]))
+	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Controls["Inventory Screen"]))
 }
 
 /**
@@ -311,7 +311,7 @@ Diablo2_OpenInventory() {
  */
 Diablo2_ClearScreen() {
 	global Diablo2
-	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Keys["Clear Screen"]))
+	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Controls["Clear Screen"]))
 }
 
 /**
@@ -356,23 +356,23 @@ Diablo2_Send(Keys) {
  */
 
 /**
- * Check to make sure a key is assigned, exiting with an error if not. The key is returned in Send
+ * Check to make sure a control is assigned, exiting with an error if not. The key binding is returned in Send
  * syntax.
  *
  * Arguments:
- * KeyName
- *     Name of the key
+ * Function
+ *     Action the control performs
  * Feature
- *     Feature for which the key is needed
+ *     Feature for which the control is needed
  *
  * Return value: Key in Send syntax
  */
-Diablo2_Private_RequireKey(KeyName, Feature) {
+Diablo2_Private_RequireControl(Function, Feature) {
 	global Diablo2
 
-	Key := Diablo2.Keys[KeyName]
+	Key := Diablo2.Controls[Function]
 	if (Key == "") {
-		Diablo2_Fatal(Format("Key assignment for {} is required for {}", KeyName, Feature))
+		Diablo2_Fatal(Format("Control assignment for {} is required for {}", Function, Feature))
 	}
 	return Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
 }
@@ -415,7 +415,7 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
 	}
 	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the
 	; order they were declared.
-	; This is important for the key bindings, where the order does matter.
+	; This is important for the controls, where the order does matter.
 	return JSON.Load(FileContents, true)
 }
 
