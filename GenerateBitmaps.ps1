@@ -44,7 +44,7 @@ foreach ($Type in @('Healing', 'Mana')) {
 	++$TypeIndex
 }
 $Coords['Rejuvenation'] = @{
-	'Regular' = @(430, 368, 8, 13);
+	'Regular' = @(430, 386, 8, 13);
 	'Full' = @(454, 382, 12, 18);
 }
 Add-Type -AssemblyName System.Drawing
