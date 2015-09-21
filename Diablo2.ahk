@@ -97,7 +97,7 @@ Diablo2_Reset() {
 
 	EnableFillPotion := true
 	if (Diablo2.ConfigFiles.FillPotion != "") {
-		for _, Function in ["Inventory Screen", "Clear Screen"] {
+		for _, Function in ["Inventory Screen", "Show Belt", "Clear Screen"] {
 			Diablo2_Private_RequireControl(Function, "FillPotion")
 		}
 
@@ -305,6 +305,16 @@ Diablo2_OpenInventory() {
 }
 
 /**
+ * Show the potion belt.
+ *
+ * Return value: None
+ */
+Diablo2_ShowBelt() {
+	global Diablo2
+	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Controls["Show Belt"]))
+}
+
+/**
  * Clear the screen.
  *
  * Return value: None
@@ -323,6 +333,7 @@ Diablo2_FillPotion() {
 	global Diablo2
 	Diablo2_Private_FillPotionLog("Starting run")
 	Diablo2_OpenInventory()
+	Diablo2_ShowBelt()
 	Diablo2_Send("{Shift down}")
 	Diablo2.FillPotion.Function.Call()
 }
