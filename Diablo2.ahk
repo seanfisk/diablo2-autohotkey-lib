@@ -348,7 +348,7 @@ Diablo2_Send(Keys) {
 	; Always use SendInput; it works well with Diablo II. We use this
 	; instead of SendMode because settings with SendMode get reset for
 	; each new thread.
-  SendInput, %Keys%
+	SendInput, %Keys%
 }
 
 /**************************************************************************************************
@@ -578,13 +578,12 @@ Diablo2_Private_FillPotionBegin() {
  *
  * Return value: None
  */
-Diablo2_Private_FillPotionClick(X, Y) {
+Diablo2_Private_FillPotionClick(Coords) {
 	; The sleeps here are totally emperical. Just seems to work best this way.
 	Sleep, 150
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
-	; Click doesn't support expressions (at all). Hence the use of X and Y above.
-	Click, %X%, %Y%
+	Diablo2_Send(Format("{{}Click {}, {}{}}", Coords.X, Coords.Y))
 	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
@@ -639,19 +638,20 @@ Diablo2_Private_FillPotionWindowed() {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			Loop {
 				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{} {}", Diablo2.FillPotion.Variation, NeedlePath)
+				Potion := {X: PotionX, Y: PotionY}
 				if (ErrorLevel == 2) {
 					Diablo2_Fatal(NeedlePath . Diablo2.Log.Sep . "Needle image file not found")
 				}
 				if (ErrorLevel == 1) {
 					break ; Image not found on the screen.
 				}
-				if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
+				if (LastPotion.X == Potion.X and LastPotion.Y == Potion.Y) {
 					Diablo2_Private_FillPotionLogType(Type_, "Finished for run due to full belt")
 					break, WindowedSizeLoop
 				}
-				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", PotionX, PotionY))
-				Diablo2_Private_FillPotionClick(PotionX, PotionY)
-				LastPotion := {X: PotionX, Y: PotionY}
+				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
+				Diablo2_Private_FillPotionClick(Potion)
+				LastPotion := Potion
 			}
 		}
 		if (LastPotion.X == -1) {
@@ -772,7 +772,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			Loop, % Diablo2_Private_Min(NumPotionsAllowedToClick, NumPotionsFound) {
 				Potion := PotionsFound[A_Index]
 				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
-				Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
+				Diablo2_Private_FillPotionClick(Potion)
 				PotionsClicked.Push(Potion)
 			}
 
