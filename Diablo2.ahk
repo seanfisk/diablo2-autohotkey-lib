@@ -179,7 +179,7 @@ Diablo2_Reset() {
   *
   * Return value: None
   */
- Diablo2_InitConstants() {
+Diablo2_InitConstants() {
 	global Diablo2 := {HotkeyCondition: "ahk_classDiablo II"
 		, InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}
 		, RegistryKey: "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"
