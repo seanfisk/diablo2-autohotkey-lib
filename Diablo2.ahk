@@ -108,6 +108,12 @@ Diablo2_Reset() {
 		RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
 		Diablo2.InstallPath := InstallPath
 
+		; Set variation if it wasn't provided
+		if (Diablo2.FillPotion.Variation == "") {
+			; Variation defaults are recommend; they were determined emperically
+			Diablo2.FillPotion.Variation := Diablo2.FillPotion.Fullscreen ? 50 : 120
+		}
+
 		; Prepare potion structures
 		for _, Type_ in ["Healing", "Mana"] {
 			Diablo2.FillPotion.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
@@ -630,7 +636,7 @@ Diablo2_Private_FillPotionWindowed() {
 		for _, Size in Sizes {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			Loop {
-				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, *120 %NeedlePath%
+				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{} {}", Diablo2.FillPotion.Variation, NeedlePath)
 				if (ErrorLevel == 2) {
 					Diablo2_Fatal(NeedlePath . Diablo2.Log.Sep . "Needle image file not found")
 				}
@@ -729,7 +735,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 				, CoordsListString
 				, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y
 				, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y
-				, 50 ; Variation; determined emperically
+				, Diablo2.FillPotion.Variation
 				; These two blank parameters are transparency color and search direction.
 				, ,
 				; For the number of instances to find, pass one more than the user requested so that we
