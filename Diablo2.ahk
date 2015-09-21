@@ -332,6 +332,7 @@ Diablo2_ClearScreen() {
 Diablo2_FillPotion() {
 	global Diablo2
 	Diablo2_Private_FillPotionLog("Starting run")
+	Diablo2_ClearScreen()
 	Diablo2_OpenInventory()
 	Diablo2_ShowBelt()
 	Diablo2_Send("{Shift down}")
