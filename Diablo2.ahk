@@ -492,7 +492,7 @@ Diablo2_Private_ActivateSkill(Key) {
 		Diablo2.Skills.Current.WeaponSet := PreferredWeaponSet
 	}
 
-	if (Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] != Key) {
+	if (Diablo2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] != Key) {
 		if (ShouldSwapWeaponSet) {
 			; If we just switched weapons, we need to sleep very slightly
 			; while the game actually swaps weapons.
@@ -501,7 +501,7 @@ Diablo2_Private_ActivateSkill(Key) {
 		Diablo2_Private_SkillsLog(Format("Switching to skill on '{}'", Key))
 		Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Key))
 
-		Diabl2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] := Key
+		Diablo2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] := Key
 	}
 
 	; Turn on hotkeys.
