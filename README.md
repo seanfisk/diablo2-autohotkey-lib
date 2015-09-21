@@ -45,8 +45,6 @@ Known Issues
 
 **Old skill for weapon set used when activating a skill which causes a weapon swap.** This can happen because the macros wait slightly to activate the skill after swapping weapons. There really isn't a way around this because the game takes a short amount of time to swap weapons, and the same thing would probably happen if you did it manually. Just wait slightly longer before using the skill.
 
-**Keys become unbound when auto-configuring.** This can happen if you have two actions assigned to the same key. The action which comes last in the list will take precedence and unbind the earlier action. Check your configuration for duplicate keys.
-
 Is this considered botting?
 ---------------------------
 

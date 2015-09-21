@@ -250,17 +250,42 @@ Diablo2_SetKeyBindings() {
 	; Suspend all hotkeys while assigning key bindings.
 	Suspend On
 
-	for KeyFunction, Value in Diablo2.Keys
-	{
-		if (KeyFunction == "Skills" or KeyFunction == "Belt") {
-			; Each of these names contain a list of keys.
+	; Flatten the binding list for easier duplicate detection.
+	FlatBindings := []
+	for Function, Value in Diablo2.Keys {
+		if (Function == "Skills" or Function == "Belt") {
+			; Each of these names contain a list of bindings.
 			for ListIndex, ListElement in Value {
-				Diablo2_Private_AssignKeyAndAdvance(ListElement)
+				FlatBindings.Push({Function: Format("{} {}", Function, ListIndex), Binding: ListElement})
 			}
 		}
 		else {
-			Diablo2_Private_AssignKeyAndAdvance(Value)
+			FlatBindings.Push({Function: Function, Binding: Value})
 		}
+	}
+
+	BindingFunctions := {}
+	for _, Control_ in FlatBindings {
+		Function := Control_.Function
+		Binding := Control_.Binding
+
+		; If the user passed null in the JSON file, delete the binding.
+		if (Binding == "") {
+			Diablo2_Send("{Delete}")
+		}
+		else {
+			; Check for duplicates
+			DuplicateBindingFunction := BindingFunctions[Binding]
+			if (DuplicateBindingFunction != "") {
+				Diablo2_Fatal(Format("Duplicate key binding '{}' for '{}' and '{}'"
+					, Binding, DuplicateBindingFunction, Function))
+			}
+			BindingFunctions[Binding] := Function
+
+			; Assign the key binding
+			Diablo2_Send("{Enter}" . Diablo2_Private_HotkeySyntaxToSendSyntax(Binding))
+		}
+		Diablo2_Send("{Down}")
 	}
 
 	; Turn hotkeys back on.
@@ -435,27 +460,6 @@ Diablo2_Private_HotkeySyntaxToSendSyntax(HotkeyString) {
  */
 Diablo2_Private_Min(A, B) {
 	return A < B ? A : B
-}
-
-/**
- * Assign a single key binding in the "Configure Controls" screen, advancing to the next control
- * afterward.
- *
- * Arguments:
- * KeyString
- *     The key to assign to the current control, in Hotkey syntax.
- *
- * Return value: None
- */
-Diablo2_Private_AssignKeyAndAdvance(KeyString) {
-	global Diablo2
-	if (KeyString == "") {
-		Diablo2_Send("{Delete}")
-	}
-	else {
-		Diablo2_Send("{Enter}" . Diablo2_Private_HotkeySyntaxToSendSyntax(KeyString))
-	}
-	Diablo2_Send("{Down}")
 }
 
 Diablo2_Private_SkillsLog(Message) {
