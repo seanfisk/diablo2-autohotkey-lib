@@ -775,17 +775,20 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			}
 
 			; Click potions.
-			NumPotionsAllowedToClick := Diablo2.FillPotion.FullscreenPotionsPerScreenshot == 0 ? NumPotionsFound : (Diablo2.FillPotion.FullscreenPotionsPerScreenshot - PotionsClicked.Length())
-			Loop, % Diablo2_Private_Min(NumPotionsAllowedToClick, NumPotionsFound) {
+			NumPotionsToClick := (Diablo2.FillPotion.FullscreenPotionsPerScreenshot == 0
+				? NumPotionsFound
+				: Diablo2_Private_Min(NumPotionsFound
+					, Diablo2.FillPotion.FullscreenPotionsPerScreenshot - PotionsClicked.Length()))
+			Loop, % NumPotionsToClick {
 				Potion := PotionsFound[A_Index]
 				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
 				Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
 				PotionsClicked.Push(Potion)
 			}
 
-			if (NumPotionsFound > NumPotionsAllowedToClick) {
-				; If we found more potions than we are allowed to click, we are definitely not finished.
-				; But we can't click any more potions of this type for this screenshot.
+			if (Diablo2.FillPotion.FullscreenPotionsPerScreenshot > 0
+				and PotionsClicked.Length() >= Diablo2.FillPotion.FullscreenPotionsPerScreenshot) {
+				; We can't click any more potions for this screenshot.
 				Finished := false
 				Diablo2_Private_FillPotionLogType(Type_, "Finished for screenshot")
 				break
