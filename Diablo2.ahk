@@ -221,13 +221,12 @@ Diablo2_Fatal(Message) {
 Diablo2_StartGame() {
 	Diablo2_InitConstants()
 	global Diablo2
-	for _, Var in ["GamePath", "CmdLine"] {
-		; CmdLine typically contains -skiptobnet, which is what we want. But this allows the user
-		; to change it through the registry as well.
-		RegRead, %Var%, % Diablo2.RegistryKey, %Var%
-	}
+	; XXX: Don't use CmdLine from the registry -- the game modifies this
+	; when run. When we pass -skiptobnet, it adds this to CmdLine,
+	; too... not sure how to avoid this.
+	RegRead, GamePath, % Diablo2.RegistryKey, GamePath
 	SplitPath, GamePath, , GameDir
-	Run, %GamePath% %CmdLine%, %GameDir%
+	Run, "%GamePath%" -skiptobnet, %GameDir%
 	; We considered saving the PID from this and using ahk_pid to limit hotkeys to that, but it's
 	; adding unnecessary complexity. There can be only one Diablo II instance running at a time
 	; anyway.
