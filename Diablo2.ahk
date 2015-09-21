@@ -322,6 +322,8 @@ Diablo2_ClearScreen() {
 Diablo2_FillPotion() {
 	global Diablo2
 	Diablo2_Private_FillPotionLog("Starting run")
+	Diablo2_OpenInventory()
+	Diablo2_Send("{Shift down}")
 	Diablo2.FillPotion.Function.Call()
 }
 
@@ -560,30 +562,34 @@ Diablo2_Private_FillPotionImagePath(Type_, Size) {
 }
 
 /**
- * Open inventory and prepare for potion belt insertion.
- *
- * Return value: None
- */
-Diablo2_Private_FillPotionBegin() {
-	Diablo2_OpenInventory()
-	Diablo2_Send("{Shift down}")
-}
-
-/**
  * Perform a click to insert a potion into the belt.
  *
  * Arguments:
- * Coords
- *     Coordinates of the intended click.
+ * X
+ *     X coordinate of the intended click
+ * Y
+ *     Y coordinate of the intended click
  *
  * Return value: None
  */
-Diablo2_Private_FillPotionClick(Coords) {
+Diablo2_Private_FillPotionClick(X, Y) {
 	; The sleeps here are totally emperical. Just seems to work best this way.
 	Sleep, 150
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
-	Diablo2_Send(Format("{{}Click {}, {}{}}", Coords.X, Coords.Y))
+	; The following code *should* work with or without SendMode, Input
+	; on since Diablo2_Send() uses SendInput. But it doesn't work with
+	; either! SendInput seems to be sending all its mouse clicks and
+	; moves with SendEvent.
+
+	; Using Diablo2_Send avoids having to change the SendMode for
+	; Click/MouseMove. The 0 argument to the last Click says to move
+	; only, not click.
+	;Diablo2_Send(Format("{{}Click {}, {}{}}{{}Click, {}, {}, 0{}}"
+	;	, X, Y, MouseX, MouseY))
+
+	; Click doesn't support expressions (at all). Hence the use of X and Y above...
+	Click, %X%, %Y%
 	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
@@ -625,12 +631,12 @@ Diablo2_Private_FillPotionLogSize(Type_, Size, Message) {
 Diablo2_Private_FillPotionWindowed() {
 	global Diablo2
 
-	; Reset CoordMode for this thread.
+	; Reset CoordMode and SendMode for this thread.
 	for _, Category in ["Pixel", "Mouse"] {
 		CoordMode, %Category%, Client
 	}
+	SendMode, Input
 
-	Diablo2_Private_FillPotionBegin()
 	for Type_, Sizes in Diablo2.FillPotion.Potions {
 		LastPotion := {X: -1, Y: -1}
 		WindowedSizeLoop:
@@ -638,20 +644,19 @@ Diablo2_Private_FillPotionWindowed() {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			Loop {
 				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{} {}", Diablo2.FillPotion.Variation, NeedlePath)
-				Potion := {X: PotionX, Y: PotionY}
 				if (ErrorLevel == 2) {
 					Diablo2_Fatal(NeedlePath . Diablo2.Log.Sep . "Needle image file not found")
 				}
 				if (ErrorLevel == 1) {
 					break ; Image not found on the screen.
 				}
-				if (LastPotion.X == Potion.X and LastPotion.Y == Potion.Y) {
+				if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
 					Diablo2_Private_FillPotionLogType(Type_, "Finished for run due to full belt")
 					break, WindowedSizeLoop
 				}
-				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
-				Diablo2_Private_FillPotionClick(Potion)
-				LastPotion := Potion
+				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", PotionX, PotionY))
+				Diablo2_Private_FillPotionClick(PotionX, PotionY)
+				LastPotion := {X: PotionX, Y: PotionY}
 			}
 		}
 		if (LastPotion.X == -1) {
@@ -681,7 +686,7 @@ Diablo2_Private_FillPotionTakeScreenshot(CallbackName) {
 }
 
 /**
- * Fill the potion belt in fullscreen mode.
+ * Being filling the potion belt in fullscreen mode.
  *
  * Return value: None
  */
@@ -692,13 +697,12 @@ Diablo2_Private_FillPotionFullscreenBegin() {
 	for Type_ in Diablo2.FillPotion.Potions {
 		Diablo2.FillPotion["State", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
 	}
-	Diablo2_Private_FillPotionBegin()
 	Sleep, 100 ; Wait for the inventory to appear
 	Diablo2_Private_FillPotionTakeScreenshot("Diablo2_Private_FillPotionFullscreen")
 }
 
 /**
- * Fill the potion belt in fullscreen mode.
+ * Process screenshot to fill the potion belt in fullscreen mode.
  *
  * Return value: None
  */
@@ -713,6 +717,9 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 	; Both the "from" and "to" paths will be populated for FILE_NOTIFY_CHANGE_LAST_WRITE, but
 	; we'll just use the latter.
 	global Diablo2
+
+	; Reset SendMode for this thread.
+	SendMode, Input
 
 	Diablo2_Private_FillPotionLog("Processing " . HaystackPath)
 
@@ -772,7 +779,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			Loop, % Diablo2_Private_Min(NumPotionsAllowedToClick, NumPotionsFound) {
 				Potion := PotionsFound[A_Index]
 				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
-				Diablo2_Private_FillPotionClick(Potion)
+				Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
 				PotionsClicked.Push(Potion)
 			}
 
