@@ -207,7 +207,7 @@ Diablo2_LogMessage(Message, Level := "DEBUG") {
  */
 Diablo2_Fatal(Message) {
 	Diablo2_LogMessage(Message, "FATAL")
-	ExitApp
+	ExitApp 1
 }
 
 /**
