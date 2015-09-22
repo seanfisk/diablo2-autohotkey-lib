@@ -229,8 +229,7 @@ Diablo2_ConfigureControls() {
 
 	Diablo2_Log("Configuring controls")
 
-	; Suspend all hotkeys while assigning controls.
-	Suspend On
+	Diablo2_Private_SuspendAndBlock(true)
 
 	; Flatten the control list for easier duplicate detection.
 	FlatControls := []
@@ -272,8 +271,7 @@ Diablo2_ConfigureControls() {
 		Diablo2_Send("{Down}")
 	}
 
-	; Turn hotkeys back on.
-	Suspend Off
+	Diablo2_Private_SuspendAndBlock(false)
 
 	Diablo2_Log("Controls assigned")
 }
@@ -332,10 +330,6 @@ Diablo2_SkillActivate(Key) {
 	PreferredWeaponSet := Diablo2.Skills.WeaponSetForKey[Key]
 	ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != Diablo2.Skills.State.WeaponSet)
 
-	; Suspend all hotkeys while this stuff is happening.
-	; This decreases the chance of the game and macros getting out-of-sync.
-	Suspend, On
-
 	if (ShouldSwapWeaponSet) {
 		; Swap to the other weapon
 		Diablo2_Private_SkillsLog("Swapping to weapon set " . PreferredWeaponSet)
@@ -354,9 +348,6 @@ Diablo2_SkillActivate(Key) {
 
 		Diablo2.Skills.State.Skills[Diablo2.Skills.State.WeaponSet] := Key
 	}
-
-	; Turn on hotkeys.
-	Suspend, Off
 }
 
 /**
@@ -512,6 +503,17 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
 	; order they were declared.
 	; This is important for the controls, where the order does matter.
 	return JSON.Load(FileContents, true)
+}
+
+/**
+ * Turn on/off suspesion of hotkeys and input blocking.
+ *
+ * Return value: None
+ */
+Diablo2_Private_SuspendAndBlock(Enable) {
+	Mode := Enable ? "On": "Off"
+	Suspend, %Mode%
+	BlockInput, %Mode%
 }
 
 /**
