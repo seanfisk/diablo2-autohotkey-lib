@@ -346,6 +346,7 @@ Diablo2_FillPotion() {
  */
 Diablo2_FillPotionGenerateBitmaps() {
 	Diablo2_Private_FillPotionLog("Generating new needle bitmaps")
+	Diablo2_ClearScreen()
 	Diablo2_OpenInventory()
 	Sleep, 100 ; Wait for the inventory to appear
 	Diablo2_Private_FillPotionTakeScreenshot("Diablo2_Private_FillPotionGenerateBitmaps")

@@ -87,7 +87,15 @@ Start the macros then start your game. If you are already running the game, make
 
 ### Fill Potion Belt
 
-The setup for this macro is a little bit more elaborate because it relies on image recognition. This setup assumes you are running the game in 800x600 fullscreen mode. First, in the Diablo II menu, adjust your video settings how you'd like them. If you choose to adjust your video settings later, you will have re-configure. Next, arrange potions in your inventory at the top left as follows:
+The setup for this macro is a little bit more elaborate because it relies on image recognition to find potions in your inventory. Before recognizing images, however, we need to generate bitmaps of each potion. The bitmap generation script is written using [PowerShell][ps], so we need to allow the system to run PowerShell scripts. Do this by opening a PowerShell prompt as an Administrator and running:
+
+```posh
+Set-ExecutionPolicy RemoteSigned
+```
+
+Start the macros. Now, open Diablo II and from the in-game pause menu choose *Video Settings*. Make sure your resolution is set to 800x600; the macros will not work unless this resolution is used. Adjust your Gamma and Contrast to the preferred levels, as these affect the appearance of the potions on the screen.
+
+Next, open your inventory and arrange potions at the top left as follows:
 
 <table>
     <tr>
@@ -110,9 +118,9 @@ The setup for this macro is a little bit more elaborate because it relies on ima
     </tr>
 </table>
 
-You can have any other items in your inventory, but do not leave any of these potions out, *even if you do not intend to use potions of that type*.
+You may have any other items in your inventory, but do not leave any of these potions out, *even if you do not intend to use potions of that type*.
 
-Close your inventory (*this is important*). Now press your bitmap generation key (default is Ctrl+Alt+b). You will see your inventory open up, then close shortly after. If your inventory does not close, there has been a problem; check the log. If it did close, you should now have an `Images` directory in your `Personal` directory with bitmaps of each potion. FillPotion should now be enabled! Try running it your FillPotion key (default is f). There are some settings that can be configured in `FillPotion.json`, but for the most part you should leave them alone.
+Now press your bitmap generation key (default is Ctrl+Alt+b). You will see your inventory open up, then close shortly after. If your inventory does not close, there has been a problem; check the log. If it did close, you should now have an `Images` directory in your `Personal` directory with bitmaps of each potion. FillPotion should now be enabled! Try running it using your FillPotion key (default is f). There are some settings that can be configured in `FillPotion.json`, but for the most part you should leave them alone.
 
 Known Issues
 ------------
