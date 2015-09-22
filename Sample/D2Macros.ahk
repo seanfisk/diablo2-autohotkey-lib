@@ -12,11 +12,16 @@ SetWorkingDir %A_ScriptDir%
 
 ; Initialize the macros by giving the paths to the configuration
 ; files.
-;
-; Passing "Log.txt" creates that file in this directory and logs
-; information to it. I *highly recommend* leaving logging on, as it
-; makes debugging problems with the macros much easier.
-Diablo2_Init("Controls.json", "Skills.json", "FillPotion.json", "Log.txt")
+Diablo2_Init("Controls.json"
+	, "Skills.json"
+	, "FillPotion.json"
+	; Passing "Log.txt" creates that file in this directory and logs
+	; information to it. I *highly recommend* leaving logging on, as it
+	; makes debugging problems with the macros much easier.
+	, "Log.txt"
+	; Enable voice alerts. Helpful for feedback from the macro while
+	; in-game.
+	, true)
 
 ; Activate the following hotkeys only in the Diablo II game itself.
 #IfWinActive ahk_class Diablo II

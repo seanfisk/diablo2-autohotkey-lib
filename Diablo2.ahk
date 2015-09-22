@@ -45,16 +45,20 @@ Diablo2_Init(ControlsConfigPath
 	Diablo2.ConfigFiles := {Controls: ControlsConfigPath, Skills: SkillsConfigPath, FillPotion: FillPotionConfigPath}
 	Diablo2["Log", "Path"] := LogPath
 	Diablo2["Voice", "Enable"] := EnableVoiceAlerts
-	Diablo2_Reset()
+	Diablo2_Reset("initialized")
 }
 
 /**
  * Reset the macros by re-reading the configuration files passed to Diablo2_Init() and resetting
  * internal macro structures.
  *
+ * Arguments:
+ * Action
+ *     Reason why this function is being called
+ *
  * Return value: None
  */
-Diablo2_Reset() {
+Diablo2_Reset(Action := "reset") {
 	global Diablo2
 
 	Diablo2.Log.Sep := "|"
@@ -65,9 +69,9 @@ Diablo2_Reset() {
 		Diablo2.Log.FileObj := FileOpen(Diablo2.Log.Path, "a")
 		; Separate this session from the last with a newline
 		Diablo2.Log.FileObj.Write("`r`n")
-		Diablo2.Log.Func := Func("Diablo2_Private_DoLogMessage")
+		Diablo2.Log.Func := Func("Diablo2_Private_DoLog")
 	}
-	Diablo2_LogMessage("Diablo2 AHK library initializing")
+	Diablo2_Log("Logging " . Action)
 
 	; Set up voice
 	if (Diablo2.Voice.Enable) {
@@ -76,7 +80,6 @@ Diablo2_Reset() {
 		Loop, % Voices.Count {
 			; Prefer Hazel (case-insensitive) because I like her voice :)
 			Voice := Voices.Item(A_Index - 1)
-			MsgBox, % Voice.GetAttribute("Name")
 			if InStr(Voice.GetAttribute("Name"), "Hazel", false) {
 				Diablo2.Voice.SpVoice.Voice := Voice
 				break
@@ -88,6 +91,7 @@ Diablo2_Reset() {
 	else {
 		Diablo2.Voice.Func := Func("")
 	}
+	Diablo2_Log("Voice " . (Diablo2.Voice.Enable ? Action : "disabled"))
 
 	; Configuration
 	Diablo2.Controls := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Controls)
@@ -119,81 +123,18 @@ Diablo2_Reset() {
 
 		Diablo2_Private_SkillsLog("Enabled")
 	}
-
-	EnableFillPotion := true
-	if (Diablo2.ConfigFiles.FillPotion != "") {
-		for _, Function in ["Inventory Screen", "Show Belt", "Clear Screen"] {
-			Diablo2_Private_RequireControl(Function, "FillPotion")
-		}
-
-		; Read the config file
-		Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.FillPotion)
-
-		; We use screen shots in both windowed and fullscreen to generate
-		; bitmaps, so we need the key and installation path for both.
-		Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireControl("Screen Shot", "FillPotion")
-		; Find installation directory
-		RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
-		Diablo2.InstallPath := InstallPath
-
-		; Set variation if it wasn't provided
-		if (Diablo2.FillPotion.Variation == "") {
-			; Variation defaults are recommend; they were determined emperically
-			Diablo2.FillPotion.Variation := Diablo2.FillPotion.Fullscreen ? 50 : 120
-		}
-
-		; Prepare potion structures
-		for _, Type_ in ["Healing", "Mana"] {
-			Diablo2.FillPotion.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
-		}
-		Diablo2.FillPotion.Potions["Rejuvenation"] := ["Regular", "Full"]
-		; Reverse preference if necessary
-		if (!Diablo2.FillPotion.LesserFirst) {
-			for Type_, Sizes in Diablo2.FillPotion.Potions {
-				; Reverse the array
-				; Hints here: http://www.autohotkey.com/board/topic/45876-ahk-l-arrays/
-				NewSizes := []
-				Loop, % Length := Sizes.Length() {
-					NewSizes.Push(Sizes[Length - A_Index + 1])
-				}
-				Diablo2.FillPotion.Potions[Type_] := NewSizes
-			}
-		}
-
-		if (Diablo2.FillPotion.Fullscreen) {
-			; Start GDI+ for full screen
-			Diablo2.GdipToken := Gdip_Startup()
-			if (!Diablo2.GdipToken) {
-				Diablo2_Fatal("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AHK")
-			}
-
-			; Cache needle bitmaps
-			BitmapLoop:
-			For Type_, Sizes in Diablo2.FillPotion.Potions {
-				For _, Size in Sizes {
-					Bitmap := Gdip_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
-					if (Bitmap <= 0) {
-						Diablo2_Private_FillPotionLog("Needle bitmaps not found; please generate them first")
-						EnableFillPotion := false
-						break, BitmapLoop
-					}
-					Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Bitmap
-				}
-			}
-		}
-
-		; Assign function
-		Diablo2.FillPotion.Function := Func(Diablo2.FillPotion.Fullscreen ? "Diablo2_Private_FillPotionFullscreenBegin" : "Diablo2_Private_FillPotionWindowed")
-	}
-	if (EnableFillPotion) {
-		Diablo2_Private_FillPotionLog("Enabled")
-	}
 	else {
-		Diablo2_Private_FillPotionLog("Disabled for now")
+		Diablo2_Private_SkillsLog("Disabled")
 	}
+
+	Diablo2_Private_FillPotionReset()
 
 	; Set shutdown function
 	OnExit("Diablo2_Private_Shutdown")
+
+	if (Action != "initialized") {
+		Diablo2_Speak("Macros " . Action)
+	}
 }
 
 /**
@@ -220,7 +161,7 @@ Diablo2_InitConstants() {
  *
  * Return value: None
  */
-Diablo2_LogMessage(Message, Level := "DEBUG") {
+Diablo2_Log(Message, Level := "DEBUG") {
 	global Diablo2
 	Diablo2.Log.Func.Call(Message, Level)
 }
@@ -235,7 +176,7 @@ Diablo2_LogMessage(Message, Level := "DEBUG") {
  * Return value: None
  */
 Diablo2_Fatal(Message) {
-	Diablo2_LogMessage(Message, "FATAL")
+	Diablo2_Log(Message, "FATAL")
 	ExitApp 1
 }
 
@@ -245,12 +186,14 @@ Diablo2_Fatal(Message) {
  * Argument:
  * Text
  *     String to pronounce
+ * Async
+ *     Whether to speak asynchronously
  *
  * Return value: None
  */
-Diablo2_Speak(Text) {
+Diablo2_Speak(Text, Async := True) {
 	global Diablo2
-	Diablo2.Voice.Func.Call(Text)
+	Diablo2.Voice.Func.Call(Text, Async)
 }
 
 /**
@@ -284,7 +227,7 @@ Diablo2_StartGame() {
 Diablo2_ConfigureControls() {
 	global Diablo2
 
-	Diablo2_LogMessage("Configuring controls")
+	Diablo2_Log("Configuring controls")
 
 	; Suspend all hotkeys while assigning controls.
 	Suspend On
@@ -316,6 +259,8 @@ Diablo2_ConfigureControls() {
 			; Check for duplicates
 			DuplicateKeyFunction := KeyFunctions[Key]
 			if (DuplicateKeyFunction != "") {
+				Diablo2_Speak(Format("Duplicate key {} for {} and {}"
+					, Key, DuplicateKeyFunction, Function), false)
 				Diablo2_Fatal(Format("Duplicate key binding '{}' for '{}' and '{}'"
 					, Key, DuplicateKeyFunction, Function))
 			}
@@ -330,7 +275,7 @@ Diablo2_ConfigureControls() {
 	; Turn hotkeys back on.
 	Suspend Off
 
-	Diablo2_LogMessage("Controls assigned")
+	Diablo2_Log("Controls assigned")
 }
 
 /**
@@ -426,6 +371,7 @@ Diablo2_Private_RequireControl(Function, Feature) {
 
 	Key := Diablo2.Controls[Function]
 	if (Key == "") {
+		Diablo2_Speak(Format("Control {} required for {}", Function, Feature), false)
 		Diablo2_Fatal(Format("Control assignment for {} is required for {}", Function, Feature))
 	}
 	return Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
@@ -442,7 +388,7 @@ Diablo2_Private_RequireControl(Function, Feature) {
  *
  * Return value: None
  */
-Diablo2_Private_DoLogMessage(Message, Level) {
+Diablo2_Private_DoLog(Message, Level) {
 	global Diablo2
 
 	FormatTime, TimeVar, , yyyy-MM-dd HH:mm:ss
@@ -457,19 +403,23 @@ Diablo2_Private_DoLogMessage(Message, Level) {
  * Argument:
  * Text
  *     String to pronounce
+ * Async
+ *     Whether to speak asynchronously
  *
  * Return value: None
  */
-Diablo2_Private_DoSpeak(Text) {
+Diablo2_Private_DoSpeak(Text, Async) {
 	; Include here and not in the auto-execute section ("top of the
 	; script"). This is because the auto-execute section is not run when
 	; the main script does not use #Include <Diablo2> but does implicit
 	; inclusion via the library of functions.
 	#Include <TTSConstants>
 	global Diablo2
-	Diablo2.Voice.SpVoice.Speak("Awesome"
-		; Stop previous speaking, and speak asynchronously.
-		, SVSFPurgeBeforeSpeak | SVSFlagsAsync)
+	Flags := SVSFDefault
+	if (Async) {
+		Flags |= SVSFlagsAsync
+	}
+	Diablo2.Voice.SpVoice.Speak(Text, Flags)
 }
 
 /**
@@ -486,6 +436,7 @@ Diablo2_Private_SafeParseJSONFile(FilePath) {
 		FileRead, FileContents, %FilePath%
 	}
 	catch, e {
+		Diablo2_Speak("Error reading config file", false)
 		Diablo2_Fatal("Error reading file " . FilePath)
 	}
 	; Pass jsonify=true as the second parameter to allow key-value pairs to be enumerated in the
@@ -507,6 +458,7 @@ Diablo2_Private_CreateBitmapFromFile(FilePath) {
 	global Diablo2
 	Bitmap := Gdip_CreateBitmapFromFile(FilePath)
 	if (Bitmap <= 0) {
+		Diablo2_Speak("Bitmap creation failed", false)
 		Diablo2_Fatal("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
 	}
 	return Bitmap
@@ -539,7 +491,7 @@ Diablo2_Private_Min(A, B) {
 
 Diablo2_Private_SkillsLog(Message) {
 	global Diablo2
-	Diablo2_LogMessage("Skills" . Diablo2.Log.Sep . Message)
+	Diablo2_Log("Skills" . Diablo2.Log.Sep . Message)
 }
 
 /**
@@ -584,6 +536,91 @@ Diablo2_Private_ActivateSkill(Key) {
 }
 
 /**
+ * Initialize or reset FillPotion.
+ *
+ * Arguments:
+ * VoiceAlert
+ *     Announce status of the reset
+ *
+ * Return value: None
+ */
+Diablo2_Private_FillPotionReset(VoiceAlert := false) {
+	global Diablo2
+
+	if (Diablo2.ConfigFiles.FillPotion == "") {
+		return
+	}
+
+	for _, Function in ["Inventory Screen", "Show Belt", "Clear Screen"] {
+		Diablo2_Private_RequireControl(Function, "Fill Potion")
+	}
+	; Read the config file
+	Diablo2.FillPotion := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.FillPotion)
+	; We use screen shots in both windowed and fullscreen to generate
+	; bitmaps, so we need the key and installation path for both.
+	Diablo2.FillPotion.ScreenShotKey := Diablo2_Private_RequireControl("Screen Shot", "Fill Potion")
+	; Find installation directory
+	RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
+	Diablo2.InstallPath := InstallPath
+	; Set variation if it wasn't provided
+	if (Diablo2.FillPotion.Variation == "") {
+		; Variation defaults are recommend; they were determined emperically
+		Diablo2.FillPotion.Variation := Diablo2.FillPotion.Fullscreen ? 50 : 120
+	}
+	; Prepare potion structures
+	for _, Type_ in ["Healing", "Mana"] {
+		Diablo2.FillPotion.Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
+	}
+	Diablo2.FillPotion.Potions["Rejuvenation"] := ["Regular", "Full"]
+	; Reverse preference if necessary
+	if (!Diablo2.FillPotion.LesserFirst) {
+		for Type_, Sizes in Diablo2.FillPotion.Potions {
+			; Reverse the array
+			; Hints here: http://www.autohotkey.com/board/topic/45876-ahk-l-arrays/
+			NewSizes := []
+			Loop, % Length := Sizes.Length() {
+				NewSizes.Push(Sizes[Length - A_Index + 1])
+			}
+			Diablo2.FillPotion.Potions[Type_] := NewSizes
+		}
+	}
+	EnableFillPotion := true
+	if (Diablo2.FillPotion.Fullscreen) {
+		; Start GDI+ for full screen
+		Diablo2.GdipToken := Gdip_Startup()
+		if (!Diablo2.GdipToken) {
+			Diablo2_Speak("GDI+ failed", false)
+			Diablo2_Fatal("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AHK")
+		}
+		; Cache needle bitmaps
+		BitmapLoop:
+		For Type_, Sizes in Diablo2.FillPotion.Potions {
+			For _, Size in Sizes {
+				Bitmap := Gdip_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
+				if (Bitmap <= 0) {
+					Diablo2_Private_FillPotionLog("Needle bitmaps not found; please generate them first")
+					Diablo2_Speak("Please generate potion bitmaps")
+					EnableFillPotion := false
+					break, BitmapLoop
+				}
+				Diablo2.FillPotion["NeedleBitmaps", Type_, Size] := Bitmap
+			}
+		}
+	}
+	; Assign function
+	Diablo2.FillPotion.Function := Func(EnableFillPotion
+		? (Diablo2.FillPotion.Fullscreen
+			? "Diablo2_Private_FillPotionFullscreenBegin"
+			: "Diablo2_Private_FillPotionWindowed")
+		: "")
+	Action := EnableFillPotion ? "Enabled" : "Disabled"
+	Diablo2_Private_FillPotionLog(Action)
+	if (VoiceAlert) {
+		Diablo2_Speak("Fill Potion " . Action)
+	}
+}
+
+/**
  * Write needle bitmaps from a taken screenshot.
  *
  * Return value: None
@@ -608,14 +645,13 @@ Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 
 	; Check for success
 	Diablo2_Private_FillPotionLog("Bitmap generation finished with exit code " . ScriptExitCode)
-	if (ScriptExitCode != 0) {
-		Diablo2_Fatal("Needle bitmap generated failed")
+	Status := ScriptExitCode == 0 ? "succeeded" : "failed"
+	Diablo2_Private_FillPotionLog("Needle bitmap generation " . Status)
+	Diablo2_Speak("Bitmap generation " . Status)
+	if (ScriptExitCode == 0) {
+		Diablo2_ClearScreen()
+		Diablo2_Private_FillPotionReset(true)
 	}
-
-	; Reset
-	Diablo2_Private_FillPotionLog("Needle bitmap generation succeeded. Resetting...")
-	Diablo2_Reset()
-	Diablo2_ClearScreen()
 }
 
 /**
@@ -683,17 +719,17 @@ Diablo2_Private_FillPotionEnd() {
 
 Diablo2_Private_FillPotionLog(Message) {
 	global Diablo2
-	Diablo2_LogMessage("FillPotion" . Diablo2.Log.Sep . Message)
+	Diablo2_Log("FillPotion" . Diablo2.Log.Sep . Message)
 }
 
-Diablo2_Private_FillPotionLogType(Type_, Message) {
+Diablo2_Private_FillPotionLogWithType(Type_, Message) {
 	global Diablo2
 	Diablo2_Private_FillPotionLog(Format("{1:-12}{2}{3}", Type_, Diablo2.Log.Sep, Message))
 }
 
-Diablo2_Private_FillPotionLogSize(Type_, Size, Message) {
+Diablo2_Private_FillPotionLogWithSize(Type_, Size, Message) {
 	global Diablo2
-	Diablo2_Private_FillPotionLogType(Type_, Format("{1:-7}{2}{3}", Size, Diablo2.Log.Sep, Message))
+	Diablo2_Private_FillPotionLogWithType(Type_, Format("{1:-7}{2}{3}", Size, Diablo2.Log.Sep, Message))
 }
 
 /**
@@ -718,22 +754,23 @@ Diablo2_Private_FillPotionWindowed() {
 			Loop {
 				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{} {}", Diablo2.FillPotion.Variation, NeedlePath)
 				if (ErrorLevel == 2) {
+					Diablo2_Speak("Fill potion error", false)
 					Diablo2_Fatal(NeedlePath . Diablo2.Log.Sep . "Needle image file not found")
 				}
 				if (ErrorLevel == 1) {
 					break ; Image not found on the screen.
 				}
 				if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
-					Diablo2_Private_FillPotionLogType(Type_, "Finished for run due to full belt")
+					Diablo2_Private_FillPotionLogWithType(Type_, "Finished for run due to full belt")
 					break, WindowedSizeLoop
 				}
-				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", PotionX, PotionY))
+				Diablo2_Private_FillPotionLogWithSize(Type_, Size, Format("Clicking {1},{2}", PotionX, PotionY))
 				Diablo2_Private_FillPotionClick(PotionX, PotionY)
 				LastPotion := {X: PotionX, Y: PotionY}
 			}
 		}
 		if (LastPotion.X == -1) {
-			Diablo2_Private_FillPotionLogType(Type_, "Finished because no potions left")
+			Diablo2_Private_FillPotionLogWithType(Type_, "Finished because no potions left")
 		}
 	}
 	Diablo2_Private_FillPotionEnd()
@@ -811,7 +848,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 		PotionSizeLoop:
 		Loop {
 			Size := Sizes[Diablo2.FillPotion.State[Type_].SizeIndex]
-			Diablo2_Private_FillPotionLogSize(Type_, Size, "Searching")
+			Diablo2_Private_FillPotionLogWithSize(Type_, Size, "Searching")
 			NumPotionsFound := Gdip_ImageSearch(HaystackBitmap
 				, Diablo2.FillPotion.NeedleBitmaps[Type_][Size]
 				, CoordsListString
@@ -826,6 +863,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 
 			; Anything less than 0 indicates an error.
 			if (NumPotionsFound < 0) {
+				Diablo2_Speak("Fill potion error", false)
 				Diablo2_Fatal("Gdip_ImageSearch call failed with error code " . NumPotionsFound)
 			}
 
@@ -834,13 +872,13 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			for _3, CoordsString in StrSplit(CoordsListString, "`n") {
 				Coords := StrSplit(CoordsString, "`,")
 				PotionFound := {X: Coords[1], Y: Coords[2]}
-				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Found at {1},{2}", PotionFound.X, PotionFound.Y))
+				Diablo2_Private_FillPotionLogWithSize(Type_, Size, Format("Found at {1},{2}", PotionFound.X, PotionFound.Y))
 				; If any of the potions found were clicked before, the potion belt is already full
 				; of this type and we are finished with it.
 				for _4, PotionClicked in Diablo2.FillPotion.State[Type_].PotionsClicked {
 					if (PotionFound.X == PotionClicked.X and PotionFound.Y == PotionClicked.Y) {
 						Diablo2.FillPotion.State[Type_].Finished := true
-						Diablo2_Private_FillPotionLogType(Type_, "Finished for run due to full belt")
+						Diablo2_Private_FillPotionLogWithType(Type_, "Finished for run due to full belt")
 						break, PotionSizeLoop
 					}
 				}
@@ -854,7 +892,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 					, Diablo2.FillPotion.FullscreenPotionsPerScreenshot - PotionsClicked.Length()))
 			Loop, % NumPotionsToClick {
 				Potion := PotionsFound[A_Index]
-				Diablo2_Private_FillPotionLogSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
+				Diablo2_Private_FillPotionLogWithSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
 				Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
 				PotionsClicked.Push(Potion)
 			}
@@ -863,7 +901,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 				and PotionsClicked.Length() >= Diablo2.FillPotion.FullscreenPotionsPerScreenshot) {
 				; We can't click any more potions for this screenshot.
 				Finished := false
-				Diablo2_Private_FillPotionLogType(Type_, "Finished for screenshot")
+				Diablo2_Private_FillPotionLogWithType(Type_, "Finished for screenshot")
 				break
 			}
 
@@ -874,7 +912,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			; the size index has been incremented beyond the bounds of the size array.
 			if Diablo2.FillPotion.State[Type_].SizeIndex > Sizes.Length() {
 				Diablo2.FillPotion.State[Type_].Finished := true
-				Diablo2_Private_FillPotionLogType(Type_, "Finished because no potions left")
+				Diablo2_Private_FillPotionLogWithType(Type_, "Finished because no potions left")
 				break
 			}
 		}
@@ -943,12 +981,12 @@ Diablo2_Private_GdipShutdown() {
  */
 Diablo2_Private_Shutdown() {
 	global Diablo2
-	Diablo2_LogMessage("Shutting down")
-	Diablo2_LogMessage("Stopping directory watches")
+	Diablo2_Log("Shutting down")
+	Diablo2_Log("Stopping directory watches")
 	Diablo2_Private_StopWatchDirectory()
 	Diablo2_Private_GdipShutdown()
 	if (Diablo2.Log.HasKey("FileObj")) {
-		Diablo2_LogMessage("Closing log")
+		Diablo2_Log("Closing log")
 		Diablo2.Log.FileObj.Close()
 	}
 }
