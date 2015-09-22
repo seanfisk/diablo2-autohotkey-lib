@@ -119,7 +119,7 @@ Diablo2_Reset(Action := "reset") {
 		Hotkey, IfWinActive
 
 		; Macro state
-		Diablo2.Skills.Current := {WeaponSet: 1, Skills: ["", ""]}
+		Diablo2.Skills.State := {WeaponSet: 1, Skills: ["", ""]}
 
 		Diablo2_Private_SkillsLog("Enabled")
 	}
@@ -267,7 +267,7 @@ Diablo2_ConfigureControls() {
 			KeyFunctions[Key] := Function
 
 			; Assign the key binding
-			Diablo2_Send("{Enter}" . Diablo2_Private_HotkeySyntaxToSendSyntax(Key))
+			Diablo2_Send("{Enter}" . Diablo2_HotkeySyntaxToSendSyntax(Key))
 		}
 		Diablo2_Send("{Down}")
 	}
@@ -285,7 +285,7 @@ Diablo2_ConfigureControls() {
  */
 Diablo2_OpenInventory() {
 	global Diablo2
-	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Controls["Inventory Screen"]))
+	Diablo2_Send(Diablo2_HotkeySyntaxToSendSyntax(Diablo2.Controls["Inventory Screen"]))
 }
 
 /**
@@ -295,7 +295,7 @@ Diablo2_OpenInventory() {
  */
 Diablo2_ShowBelt() {
 	global Diablo2
-	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Controls["Show Belt"]))
+	Diablo2_Send(Diablo2_HotkeySyntaxToSendSyntax(Diablo2.Controls["Show Belt"]))
 }
 
 /**
@@ -305,7 +305,58 @@ Diablo2_ShowBelt() {
  */
 Diablo2_ClearScreen() {
 	global Diablo2
-	Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Diablo2.Controls["Clear Screen"]))
+	Diablo2_Send(Diablo2_HotkeySyntaxToSendSyntax(Diablo2.Controls["Clear Screen"]))
+}
+
+/**
+ * Get the current skill (represented by its hotkey).
+ *
+ * Return value: the current skill key
+ */
+Diablo2_SkillGet() {
+	global Diablo2
+	return Diablo2.Skills.State.Skills[Diablo2.Skills.State.WeaponSet]
+}
+
+/**
+ * Activate the skill assigned to the specific key.
+ *
+ * Arguments:
+ * Key
+ *     The skill hotkey
+ *
+ * Return value: None
+ */
+Diablo2_SkillActivate(Key) {
+	global Diablo2
+	PreferredWeaponSet := Diablo2.Skills.WeaponSetForKey[Key]
+	ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != Diablo2.Skills.State.WeaponSet)
+
+	; Suspend all hotkeys while this stuff is happening.
+	; This decreases the chance of the game and macros getting out-of-sync.
+	Suspend, On
+
+	if (ShouldSwapWeaponSet) {
+		; Swap to the other weapon
+		Diablo2_Private_SkillsLog("Swapping to weapon set " . PreferredWeaponSet)
+		Diablo2_Send(Diablo2.Skills.SwapKey)
+		Diablo2.Skills.State.WeaponSet := PreferredWeaponSet
+	}
+
+	if (Diablo2.Skills.State.Skills[Diablo2.Skills.State.WeaponSet] != Key) {
+		if (ShouldSwapWeaponSet) {
+			; If we just switched weapons, we need to sleep very slightly
+			; while the game actually swaps weapons.
+			Sleep, 70
+		}
+		Diablo2_Private_SkillsLog(Format("Switching to skill on '{}'", Key))
+		Diablo2_Send(Diablo2_HotkeySyntaxToSendSyntax(Key))
+
+		Diablo2.Skills.State.Skills[Diablo2.Skills.State.WeaponSet] := Key
+	}
+
+	; Turn on hotkeys.
+	Suspend, Off
 }
 
 /**
@@ -350,6 +401,24 @@ Diablo2_Send(Keys) {
 	SendInput, %Keys%
 }
 
+/**
+* Convert a key in Hotkey syntax to Send syntax.
+* Currently, if the string is more than one character, we throw curly braces around it. I'm sure
+* this doesn't account for every possible case, but it seems to work.
+*
+* Arguments:
+* HotkeyString
+*     A key string in Hotkey syntax, i.e., with unescaped special keys (e.g. F1 instead of {F1}).
+*
+* Return value: The key in Send syntax.
+*/
+Diablo2_HotkeySyntaxToSendSyntax(HotkeyString) {
+	if (StrLen(HotkeyString) > 1) {
+		return "{" HotkeyString "}"
+	}
+	return HotkeyString
+}
+
 /**************************************************************************************************
  * BEGIN PRIVATE FUNCTIONS
  */
@@ -374,7 +443,7 @@ Diablo2_Private_RequireControl(Function, Feature) {
 		Diablo2_Speak(Format("Control {} required for {}", Function, Feature), false)
 		Diablo2_Fatal(Format("Control assignment for {} is required for {}", Function, Feature))
 	}
-	return Diablo2_Private_HotkeySyntaxToSendSyntax(Key)
+	return Diablo2_HotkeySyntaxToSendSyntax(Key)
 }
 
 /**
@@ -465,24 +534,6 @@ Diablo2_Private_CreateBitmapFromFile(FilePath) {
 }
 
 /**
- * Convert a key in Hotkey syntax to Send syntax.
- * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
- * this doesn't account for every possible case, but it seems to work.
- *
- * Arguments:
- * HotkeyString
- *     A key string in Hotkey syntax, i.e., with unescaped special keys (e.g. F1 instead of {F1}).
- *
- * Return value: The key in Send syntax.
- */
-Diablo2_Private_HotkeySyntaxToSendSyntax(HotkeyString) {
-	if (StrLen(HotkeyString) > 1) {
-		return "{" HotkeyString "}"
-	}
-	return HotkeyString
-}
-
-/**
  * Return the minimum of two parameters.
  */
 Diablo2_Private_Min(A, B) {
@@ -492,47 +543,6 @@ Diablo2_Private_Min(A, B) {
 Diablo2_Private_SkillsLog(Message) {
 	global Diablo2
 	Diablo2_Log("Skills" . Diablo2.Log.Sep . Message)
-}
-
-/**
- * Activate the skill indicated by the hotkey pressed.
- *
- * Arguments:
- * Key
- *     The pressed skill hotkey.
- *
- * Return value: None
- */
-Diablo2_Private_ActivateSkill(Key) {
-	global Diablo2
-	PreferredWeaponSet := Diablo2.Skills.WeaponSetForKey[Key]
-	ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != Diablo2.Skills.Current.WeaponSet)
-
-	; Suspend all hotkeys while this stuff is happening.
-	; This decreases the chance of the game and macros getting out-of-sync.
-	Suspend, On
-
-	if (ShouldSwapWeaponSet) {
-		; Swap to the other weapon
-		Diablo2_Private_SkillsLog("Swapping to weapon set " . PreferredWeaponSet)
-		Diablo2_Send(Diablo2.Skills.SwapKey)
-		Diablo2.Skills.Current.WeaponSet := PreferredWeaponSet
-	}
-
-	if (Diablo2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] != Key) {
-		if (ShouldSwapWeaponSet) {
-			; If we just switched weapons, we need to sleep very slightly
-			; while the game actually swaps weapons.
-			Sleep, 70
-		}
-		Diablo2_Private_SkillsLog(Format("Switching to skill on '{}'", Key))
-		Diablo2_Send(Diablo2_Private_HotkeySyntaxToSendSyntax(Key))
-
-		Diablo2.Skills.Current.Skills[Diablo2.Skills.Current.WeaponSet] := Key
-	}
-
-	; Turn on hotkeys.
-	Suspend, Off
 }
 
 /**
@@ -995,7 +1005,7 @@ goto, End
 
 ; Handle all skill hotkeys with a preferred weapon set.
 SkillHotkeyActivated:
-Diablo2_Private_ActivateSkill(A_ThisHotkey)
+Diablo2_SkillActivate(A_ThisHotkey)
 return
 
 End:
