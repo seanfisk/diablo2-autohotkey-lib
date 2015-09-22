@@ -34,12 +34,17 @@
  *
  * Return value: None
  */
-Diablo2_Init(ControlsConfigPath, SkillsConfigPath := "", FillPotionConfigPath := "", LogPath := "") {
+Diablo2_Init(ControlsConfigPath
+	, SkillsConfigPath := ""
+	, FillPotionConfigPath := ""
+	, LogPath := ""
+	, EnableVoiceAlerts := false) {
 	Diablo2_InitConstants()
 	global Diablo2
 
 	Diablo2.ConfigFiles := {Controls: ControlsConfigPath, Skills: SkillsConfigPath, FillPotion: FillPotionConfigPath}
 	Diablo2["Log", "Path"] := LogPath
+	Diablo2["Voice", "Enable"] := EnableVoiceAlerts
 	Diablo2_Reset()
 }
 
@@ -62,7 +67,27 @@ Diablo2_Reset() {
 		Diablo2.Log.FileObj.Write("`r`n")
 		Diablo2.Log.Func := Func("Diablo2_Private_DoLogMessage")
 	}
-	Diablo2_LogMessage("Diablo2 AHK library initialized")
+	Diablo2_LogMessage("Diablo2 AHK library initializing")
+
+	; Set up voice
+	if (Diablo2.Voice.Enable) {
+		Diablo2.Voice.SpVoice := ComObjCreate("SAPI.SpVoice")
+		Voices := Diablo2.Voice.SpVoice.GetVoices
+		Loop, % Voices.Count {
+			; Prefer Hazel (case-insensitive) because I like her voice :)
+			Voice := Voices.Item(A_Index - 1)
+			MsgBox, % Voice.GetAttribute("Name")
+			if InStr(Voice.GetAttribute("Name"), "Hazel", false) {
+				Diablo2.Voice.SpVoice.Voice := Voice
+				break
+			}
+		}
+
+		Diablo2.Voice.Func := Func("Diablo2_Private_DoSpeak")
+	}
+	else {
+		Diablo2.Voice.Func := Func("")
+	}
 
 	; Configuration
 	Diablo2.Controls := Diablo2_Private_SafeParseJSONFile(Diablo2.ConfigFiles.Controls)
@@ -212,6 +237,20 @@ Diablo2_LogMessage(Message, Level := "DEBUG") {
 Diablo2_Fatal(Message) {
 	Diablo2_LogMessage(Message, "FATAL")
 	ExitApp 1
+}
+
+/**
+ * Speak some text with the configured voice.
+ *
+ * Argument:
+ * Text
+ *     String to pronounce
+ *
+ * Return value: None
+ */
+Diablo2_Speak(Text) {
+	global Diablo2
+	Diablo2.Voice.Func.Call(Text)
 }
 
 /**
@@ -410,6 +449,27 @@ Diablo2_Private_DoLogMessage(Message, Level) {
 	Diablo2.Log.FileObj.Write(Format("{1}.{2}{3}{4}{5}{6}`r`n"
 		, TimeVar, A_Msec, Diablo2.Log.Sep, Level, Diablo2.Log.Sep, Message))
 	Diablo2.Log.FileObj.Read(0) ; Seems like a hack, but this apparently flushes the write buffer
+}
+
+/**
+ * Perform speaking of text.
+ *
+ * Argument:
+ * Text
+ *     String to pronounce
+ *
+ * Return value: None
+ */
+Diablo2_Private_DoSpeak(Text) {
+	; Include here and not in the auto-execute section ("top of the
+	; script"). This is because the auto-execute section is not run when
+	; the main script does not use #Include <Diablo2> but does implicit
+	; inclusion via the library of functions.
+	#Include <TTSConstants>
+	global Diablo2
+	Diablo2.Voice.SpVoice.Speak("Awesome"
+		; Stop previous speaking, and speak asynchronously.
+		, SVSFPurgeBeforeSpeak | SVSFlagsAsync)
 }
 
 /**

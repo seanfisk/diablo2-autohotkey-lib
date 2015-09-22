@@ -33,6 +33,7 @@ InstallFile("Vendor\Gdip\Gdip.ahk")
 ;InstallFile("Vendor\MasterFocus\Functions\Gdip_ImageSearch\Gdip_ImageSearch.ahk")
 ; TODO: Correctly integrate our modifications to MasterFocus's Gdip_ImageSearch
 InstallFile("Vendor\Gdip_ImageSearch.ahk")
+InstallFile("Vendor\TTSConstants.ahk")
 InstallFile("GenerateBitmaps.ps1")
 
 ; Compile after installing, as RunGame.ahk makes use of Diablo2.ahk.
