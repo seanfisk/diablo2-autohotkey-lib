@@ -23,6 +23,27 @@ function EnsureDir($Dir) {
 	Write-Verbose "Created $dir"
 }
 
+function FormatSize($Size) {
+	"$($Size.Width)x$($Size.Height)"
+}
+
+Add-Type -AssemblyName System.Drawing
+# .NET doesn't pick up the PowerShell working directory, so pass it an
+# absolute path.
+$ScreenshotAbspath = (Resolve-Path $ScreenshotPath).Path
+try {
+	$ScreenshotBitmap = New-Object System.Drawing.Bitmap($ScreenshotAbspath)
+}
+catch
+{
+	throw "Could create bitmap from '$ScreenshotAbspath'. Ensure the image exists."
+}
+
+$RequiredSize = New-Object System.Drawing.Size(800, 600)
+if ( $ScreenshotBitmap.Size -ne $RequiredSize) {
+	throw "Image has dimensions $(FormatSize($ScreenshotBitmap.Size)); expected $(FormatSize($RequiredSize))"
+}
+
 $SizeCoords = @{
 	'Minor' = @(431, 327, 5, 15);
 	'Light' = @(459, 328, 7, 14);
@@ -46,17 +67,6 @@ foreach ($Type in @('Healing', 'Mana')) {
 $Coords['Rejuvenation'] = @{
 	'Regular' = @(430, 386, 8, 13);
 	'Full' = @(454, 382, 12, 18);
-}
-Add-Type -AssemblyName System.Drawing
-# .NET doesn't pick up the PowerShell working directory, so pass it an
-# absolute path.
-$ScreenshotAbspath = (Resolve-Path $ScreenshotPath).Path
-try {
-	$ScreenshotBitmap = New-Object System.Drawing.Bitmap($ScreenshotAbspath)
-}
-catch
-{
-	throw "Could create bitmap from '$ScreenshotAbspath'. Ensure the image exists."
 }
 # Again, we need an absolute path for passing to .NET.
 $ImagesDir = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) Images))
