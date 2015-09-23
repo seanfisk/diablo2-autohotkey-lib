@@ -676,19 +676,31 @@ Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
 	Diablo2_Private_GdipShutdown()
 	Diablo2_Private_FillPotionLog("Running bitmap generation script")
 	ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
+	LogPath := A_WorkingDir . "\GenerateBitmaps.log"
 	; Don't use -File: https://connect.microsoft.com/PowerShell/feedback/details/750653/powershell-exe-doesn-t-return-correct-exit-codes-when-using-the-file-option
-	RunWait, powershell -NoLogo -NonInteractive -NoProfile -Command "& '%ScriptPath%' '%ScreenshotPath%'", %A_ScriptDir%, Hide
-	ScriptExitCode := ErrorLevel
+	;
+	; The goal is to capture stdout and stderr. RunWait internally uses
+	; Wscript.Shell.Run, which doesn't capture the standard streams.
+	; Wscript.Shell.Exec does capture the standard streams, but raises a
+	; PowerShell console, kicking a fullscreen user to the desktop when
+	; it runs. This isn't acceptable, so in lieu of complicated
+	; solutions that would drop down to CreateProcess(), we've just
+	; decided to write to a temporary file.
+	RunWait, powershell -NoLogo -NonInteractive -NoProfile -Command "Start-Transcript '%LogPath%'; & '%ScriptPath%' -Verbose '%ScreenshotPath%'; Stop-Transcript", %A_WorkingDir%, Hide
+	ExitCode := ErrorLevel
 
 	; Remove the screen shot; it is not needed any more.
 	FileDelete, %ScreenshotPath%
 
+	; Log status
+	FileRead, Output, %LogPath%
+	FileDelete, %LogPath%
+	Diablo2_Private_FillPotionLog(Format("Bitmap generation finished with exit code {} and output:`r`n{}", ExitCode, RTrim(Output, "`r`n")))
 	; Check for success
-	Diablo2_Private_FillPotionLog("Bitmap generation finished with exit code " . ScriptExitCode)
-	Status := ScriptExitCode == 0 ? "succeeded" : "failed"
+	Status := ExitCode == 0 ? "succeeded" : "failed"
 	Diablo2_Private_FillPotionLog("Needle bitmap generation " . Status)
 	Diablo2_Speak("Bitmap generation " . Status)
-	if (ScriptExitCode == 0) {
+	if (ExitCode == 0) {
 		Diablo2_ClearScreen()
 		Diablo2_Private_FillPotionReset(true)
 	}
@@ -707,7 +719,7 @@ Diablo2_Private_FillPotionGenerateBitmaps(_1, _2, ScreenshotPath) {
  */
 Diablo2_Private_FillPotionImagePath(Type_, Size) {
 	global Diablo2
-	return Format("{1}\Images\{2}\{3}.png", A_ScriptDir, Type_, Size)
+	return Format("{1}\Images\{2}\{3}.png", A_WorkingDir, Type_, Size)
 }
 
 /**
