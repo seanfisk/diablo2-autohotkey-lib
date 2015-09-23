@@ -421,6 +421,27 @@ Diablo2_Send(Keys) {
 }
 
 /**
+ * Right-click while keeping the left mouse button down.
+ *
+ * Diablo II has an annoying behavior where right-clicking causes the
+ * left mouse button not to be considered as held down. This function
+ * fixes that behavior.
+ *
+ * You can enable this fix globally in your own configuration with:
+ *
+ *     RButton::Diablo2_RightClick()
+ *
+ * Return value: None
+ */
+Diablo2_RightClick() {
+	LButtonIsDown := GetKeyState("LButton")
+	Diablo2_Send("{Click right}")
+	if (LButtonIsDown) {
+		Diablo2_Send("{LButton down}")
+	}
+}
+
+/**
 * Convert a key in Hotkey syntax to Send syntax.
 * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
 * this doesn't account for every possible case, but it seems to work.

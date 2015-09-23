@@ -36,6 +36,8 @@ f::Diablo2_FillPotion()
 ; Assign Town Portal to F8 in the game. Now F8 will activate Town
 ; Portal, use it, and switch back to the last skill.
 F8::Diablo2_SkillOneOff("F8")
+; Enable the right-click fix globally.
+RButton::Diablo2_RightClick()
 
 ; Activate the following hotkeys in any application.
 #IfWinActive

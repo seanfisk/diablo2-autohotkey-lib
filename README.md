@@ -18,6 +18,8 @@ There is also a function available for use of one-off skills, such as Town Porta
 
 **Automatic filling of potion belt.** The potion belt is a great way to heal yourself quickly! However, once your potion belt is empty, you have to remove yourself from the fray to refill it. This macro automatically fills your belt with potions from your inventory *and allows you to continue moving while it is executing*. This is a massive advantage as you can get back to the action much more quickly.
 
+**Right-click fix.** Diablo II has an annoying behavior where right-clicking causes the left mouse button not to be considered as held down. Included in the library and sample configuration is a function to fix this behavior.
+
 **PLANNED: Mass inventory macros.** Select a section of items and easily stash, trade, drop, or transmute them. See #22.
 
 **PLANNED: [Steam][] compatiblity.** Run the game through Steam, open the overlay with hotkeys disabled, and open favorites in the web browser. See #21.
