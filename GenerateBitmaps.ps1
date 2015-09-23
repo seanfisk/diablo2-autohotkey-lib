@@ -81,6 +81,8 @@ foreach ($TypeItem in $Coords.GetEnumerator()) {
 		$Needle = $ScreenshotBitmap.Clone($Rect, [System.Drawing.Imaging.PixelFormat]::DontCare)
 		$NeedlePath = Join-Path $TypeDir "$Size.png"
 		$Needle.Save($NeedlePath)
+		$Needle.Dispose()
 		Write-Verbose "Wrote $NeedlePath"
 	}
 }
+$ScreenshotBitmap.Dispose()
