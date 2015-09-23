@@ -438,6 +438,31 @@ Diablo2_HotkeySyntaxToSendSyntax(HotkeyString) {
 	return HotkeyString
 }
 
+/**
+ * Suspend the macros.
+ *
+ * Arguments:
+ * Mode
+ *     Passed directly to Suspend command
+ *
+ * Return value: None
+ */
+Diablo2_Suspend(Mode := "Toggle") {
+	Suspend, %Mode%
+	Diablo2_Speak(A_IsSuspended ? "Suspended" : "Resumed")
+}
+
+/**
+ * Exit the macros.
+ *
+ * Return value: None
+ */
+Diablo2_Exit() {
+	Suspend, Permit
+	Diablo2_Speak("Exiting", false)
+	ExitApp
+}
+
 /**************************************************************************************************
  * BEGIN PRIVATE FUNCTIONS
  */

@@ -43,6 +43,6 @@ F8::Diablo2_SkillOneOff("F8")
 ; Don't use a key used for Diablo II, as the hotkey for suspend itself
 ; won't be suspended. Ideally, use a hotkey that won't be used in any
 ; applications globally.
-^!s::Suspend
+^!s::Diablo2_Suspend()
 ; Quit the macros
-^!x::ExitApp
+^!x::Diablo2_Exit()
