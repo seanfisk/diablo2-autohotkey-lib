@@ -14,6 +14,8 @@ Here's a motivating example; in fact, the one that motivated these macros' creat
 
 These macros solve this problem by allowing you to specify the preferred weapon set for each skill. When you press that skill's key, the macros automatically switch to the preferred weapon if you are not currently using it.
 
+There is also a function available for use of one-off skills, such as Town Portal. This function allows you to assign a hotkey which switches to a skill, uses it, and then switches back to the last skill.
+
 **Automatic filling of potion belt.** The potion belt is a great way to heal yourself quickly! However, once your potion belt is empty, you have to remove yourself from the fray to refill it. This macro automatically fills your belt with potions from your inventory *and allows you to continue moving while it is executing*. This is a massive advantage as you can get back to the action much more quickly.
 
 **PLANNED: Mass inventory macros.** Select a section of items and easily stash, trade, drop, or transmute them. See #22.
@@ -84,6 +86,8 @@ If there are duplicate keys, they will be detected and the cursor will not move 
 ### Skill-based Weapon Sets
 
 Start the macros then start your game. If you are already running the game, make sure you are on your primary weapon set using the "Swap Weapons" key. Start the macros, and immediately stop using the "Swap Weapons" key (that's the whole point, remember?). The macros currently have no way of knowing what weapon set or skill you are currently using other than intercepting your keystrokes. The "Swap Weapons" key is deliberately not hotkeyed, so if the macros become out-of-sync with the game you can manually correct by swapping your weapons.
+
+See the sample file for an example on how to assign a hotkey to a one-off skill, like Town Portal.
 
 ### Fill Potion Belt
 

@@ -351,6 +351,34 @@ Diablo2_SkillActivate(Key) {
 }
 
 /**
+ * Perform a one-off skill.
+ * This is done by switching to the skill, right-clicking,
+ * and switching back to the old skill. For best performance, this
+ * skill should not have a weapon set associated with it. But it
+ * will work with or without it.
+ *
+ * Arguments:
+ * Key
+ *     The skill hotkey
+ *
+ * Return value: None
+ */
+Diablo2_SkillOneOff(Key) {
+	LButtonIsDown := GetKeyState("LButton")
+	CurrentSkill := Diablo2_SkillGet()
+	Diablo2_SkillActivate(Key)
+	Diablo2_Send("{Click right}")
+	Diablo2_SkillActivate(CurrentSkill)
+	; There are probably times when this isn't necessary, but it's
+	; really useful, for example, to keep moving after performing a
+	; Teleport. It's useful enough that it's included as the default
+	; behavior.
+	if (LButtonIsDown) {
+		Diablo2_Send("{LButton down}")
+	}
+}
+
+/**
  * Fill the potion belt.
  *
  * Return value: None

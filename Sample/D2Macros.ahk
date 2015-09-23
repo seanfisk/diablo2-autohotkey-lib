@@ -33,6 +33,9 @@ Diablo2_Init("Controls.json"
 ^!r::Diablo2_Reset()
 ; Just 'f' runs FillPotion.
 f::Diablo2_FillPotion()
+; Assign Town Portal to F8 in the game. Now F8 will activate Town
+; Portal, use it, and switch back to the last skill.
+F8::Diablo2_SkillOneOff("F8")
 
 ; Activate the following hotkeys in any application.
 #IfWinActive
