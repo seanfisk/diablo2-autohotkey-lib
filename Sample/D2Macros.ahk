@@ -38,6 +38,12 @@ F8::Diablo2_SkillOneOff("F8")
 ; Enable the right-click fix globally.
 RButton::Diablo2_RightClick()
 
+; Mass item macros
+6::Diablo2_MassItemSelectStart()
+7::Diablo2_MassItemSelectEnd()
+8::Diablo2_MassItemDrop()
+9::Diablo2_MoveSingleCellItems()
+
 ; Activate the following hotkeys in any application.
 #IfWinActive
 

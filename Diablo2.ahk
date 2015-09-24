@@ -154,6 +154,9 @@ Diablo2_Reset(Action := "reset") {
 
 	Diablo2_Private_FillPotionReset()
 
+	; XXX Make setting of this key optional
+	Diablo2.MassItem := {StandStillKey: Diablo2_Private_RequireControl("Stand Still", "MassItem")}
+
 	; Set shutdown function
 	OnExit("Diablo2_Private_Shutdown")
 
@@ -170,7 +173,7 @@ Diablo2_Reset(Action := "reset") {
   */
 Diablo2_InitConstants() {
 	global Diablo2 := {HotkeyCondition: "ahk_classDiablo II"
-		, InventoryCoords: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}}
+		, Inventory: {TopLeft: {X: 415, Y: 310}, BottomRight: {X: 710, Y: 435}, CellSize: 29}
 		, RegistryKey: "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"
 		, AutoHotkeyLibDir : A_MyDocuments . "\AutoHotkey\Lib"}
 }
@@ -475,6 +478,138 @@ Diablo2_RightClick() {
 }
 
 /**
+ * Begin an item selection.
+ *
+ * Return value: None
+ */
+Diablo2_MassItemSelectStart() {
+	global Diablo2
+	MouseGetPos, StartX, StartY
+	Diablo2_Private_MassItemLog(Format("Selection start is {},{}", StartX, StartY))
+	Diablo2.MassItem := {Start: {X: StartX, Y: StartY}}
+	Diablo2_Speak("Select")
+}
+
+/**
+ * Finish definition of an item selection.
+ *
+ * Return value: None
+ */
+Diablo2_MassItemSelectEnd() {
+	global Diablo2
+	Start := Diablo2.MassItem.Start
+	if (!Start.X) {
+		Message := "No selection started"
+		Diablo2_Private_MassItemLog(Message, "ERROR")
+		Diablo2_Speak(Message)
+		return
+	}
+
+	MouseGetPos, EndX, EndY
+	End_ := {X: EndX, Y: EndY}
+	Size := {}
+	TopLeft := {}
+	BottomRight := {}
+	for Dim in Start {
+		TopLeft[Dim] := Diablo2_Private_Min(Start[Dim], End_[Dim])
+		BottomRight[Dim] := Diablo2_Private_Max(Start[Dim], End_[Dim])
+		Size[Dim] := ((BottomRight[Dim] - TopLeft[Dim]) // Diablo2.Inventory.CellSize) + 1
+	}
+	NumSelected := Size.X * Size.Y
+	Diablo2.MassItem.TopLeft := TopLeft
+	Diablo2.MassItem.Size := Size
+	Diablo2_Private_MassItemLog(Format("Selected {} cells (start: {},{}; end: {},{}; size: {}x{})"
+		, NumSelected, Start.X, Start.Y, End_.X, End_.Y, Size.X, Size.Y))
+	Diablo2_Speak(NumSelected)
+}
+
+/**
+ * Drop items in selection at current mouse position.
+ *
+ * Return value: None
+ */
+Diablo2_MassItemDrop() {
+	global Diablo2
+	if (!Diablo2_Private_MassItemHasSelection()) {
+		return
+	}
+	Size := Diablo2.MassItem.Size
+	TopLeft := Diablo2.MassItem.TopLeft
+
+	Diablo2_Private_MassItemLog(Format("Dropping {} cells at {},{}", Size.X * Size.Y, TopLeft.X, TopLeft.Y))
+	Diablo2_Speak("Drop")
+
+	MouseGetPos, DestX, DestY
+	Offsets := {}
+
+	Diablo2_Private_SuspendAndBlock(true)
+	Loop, % Size.Y {
+		Offsets.Y := A_Index
+		Loop, % Size.X {
+			Offsets.X := A_Index
+			Source := {}
+			for Dim, Offset in Offsets {
+				; We need unwrapped (non-object) variables for Click because it sucks
+				Source%Dim% := TopLeft[Dim] + (Offset - 1) * Diablo2.Inventory.CellSize
+			}
+			Click, %SourceX%, %SourceY%
+			; Sleep for this much for the Horadric Cube, which takes forever
+			; to accept drops apparently.
+			Sleep, 300
+			; When there is no item in the source cell, a click in the main area will cause the character to move.
+			; Send the StandStill key so the character doesn't
+			Diablo2_Send(Format("{{}{} down{}}", StandStillKey))
+			Click, %DestX%, %DestY%
+			Diablo2_Send(Format("{{}{} up{}}", StandStillKey))
+			Sleep, 300
+		}
+	}
+	Diablo2_Private_SuspendAndBlock(false)
+	Diablo2_Private_MassItemResetVars()
+}
+
+/**
+ * Move a block of single-cell items to set of empty cells.
+ *
+ * Return value: None
+ */
+Diablo2_MassItemMoveSingleCellItems() {
+	global Diablo2
+	if (!Diablo2_Private_MassItemHasSelection()) {
+		return
+	}
+	Size := Diablo2.MassItem.Size
+	MouseGetPos, DestX, DestY
+	TopLefts := {Source: Diablo2.MassItem.TopLeft, Dest: {X: DestX, Y: DestY}}
+
+	Diablo2_Private_MassItemLog(Format("Moving {} cells to {},{}"
+		, Size.X * Size.Y, Diablo2.MassItem.TopLeft.X, Diablo2.MassItem.TopLeft.Y))
+	Diablo2_Speak("Move")
+
+	Offsets := {}
+
+	Diablo2_Private_SuspendAndBlock(true)
+	Loop, % Size.Y {
+		Offsets.Y := A_Index
+		Loop, % Size.X {
+			Offsets.X := A_Index
+			for Location, TopLeft in TopLefts {
+				for Dim, Offset in Offsets {
+					; We need unwrapped (non-object) variables for Click because it sucks
+					%Location%%Dim% := TopLeft[Dim] + (Offset - 1) * Diablo2.Inventory.CellSize
+				}
+			}
+			Click, %SourceX%, %SourceY%
+			Sleep, 300
+			Click, %DestX%, %DestY%
+			Sleep, 300
+		}
+	}
+	Diablo2_Private_SuspendAndBlock(false)
+	Diablo2_Private_MassItemResetVars()
+}
+
+/**
  * Convert a key in Hotkey syntax to Send syntax.
  * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
  * this doesn't account for every possible case, but it seems to work.
@@ -649,9 +784,21 @@ Diablo2_Private_Min(A, B) {
 	return A < B ? A : B
 }
 
+/**
+* Return the maximum of two parameters.
+*/
+Diablo2_Private_Max(A, B) {
+	return A > B ? A : B
+}
+
 Diablo2_Private_SkillsLog(Message) {
 	global Diablo2
 	Diablo2_Log("Skills" . Diablo2.Log.Sep . Message)
+}
+
+Diablo2_Private_MassItemLog(Message, Level := "DEBUG") {
+	global Diablo2
+	Diablo2_Log("MassItem" . Diablo2.Log.Sep . Message, Level)
 }
 
 /**
@@ -816,11 +963,9 @@ Diablo2_Private_FillPotionClick(Coords) {
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
 
-	; Click doesn't support expressions (at all)
-	X := Coords.X
-	Y := Coords.Y
 	Diablo2_Send("{Shift down}")
-	Click, %X%, %Y%
+	; Click doesn't support expressions (at all)
+	X := Coords.X, Y := Coords.Y, Click, %X%, %Y%
 	Diablo2_Send("{Shift up}")
 	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
@@ -868,7 +1013,7 @@ Diablo2_Private_FillPotionWindowed() {
 		for _, Size in Sizes {
 			NeedlePath := Diablo2_Private_FillPotionImagePath(Type_, Size)
 			Loop {
-				ImageSearch, PotionX, PotionY, % Diablo2.InventoryCoords.TopLeft.X, % Diablo2.InventoryCoords.TopLeft.Y, % Diablo2.InventoryCoords.BottomRight.X, % Diablo2.InventoryCoords.BottomRight.Y, % Format("*{} {}", Diablo2.FillPotion.Variation, NeedlePath)
+				ImageSearch, PotionX, PotionY, % Diablo2.Inventory.TopLeft.X, % Diablo2.Inventory.TopLeft.Y, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y, % Format("*{} {}", Diablo2.FillPotion.Variation, NeedlePath)
 				if (ErrorLevel == 2) {
 					Diablo2_Speak("Fill potion error", false)
 					Diablo2_Fatal(NeedlePath . Diablo2.Log.Sep . "Needle image file not found")
@@ -966,8 +1111,8 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			NumPotionsFound := Gdip_ImageSearch(HaystackBitmap
 				, Diablo2.FillPotion.NeedleBitmaps[Type_][Size]
 				, CoordsListString
-				, Diablo2.InventoryCoords.TopLeft.X, Diablo2.InventoryCoords.TopLeft.Y
-				, Diablo2.InventoryCoords.BottomRight.X, Diablo2.InventoryCoords.BottomRight.Y
+				, Diablo2.Inventory.TopLeft.X, Diablo2.Inventory.TopLeft.Y
+				, Diablo2.Inventory.BottomRight.X, Diablo2.Inventory.BottomRight.Y
 				, Diablo2.FillPotion.Variation
 				; These two blank parameters are transparency color and search direction.
 				, ,
@@ -1060,6 +1205,33 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 		; Get the next screenshot
 		Diablo2_Send(Diablo2.FillPotion.ScreenShotKey)
 	}
+}
+
+/**
+ * Determine if there is an existing item selection.
+ *
+ * Return value: Boolean indicating existence of selection
+ */
+Diablo2_Private_MassItemHasSelection() {
+	global Diablo2
+	HasSelection := Diablo2.MassItem.Size.X and Diablo2.MassItem.TopLeft.X
+	if (!HasSelection) {
+		Message := "No selection found"
+		Diablo2_Private_MassItemLog(Message, "ERROR")
+		Diablo2_Speak(Message)
+	}
+	return HasSelection
+}
+
+/**
+ * Reset item selection.
+ *
+ * Return value: None
+ */
+Diablo2_Private_MassItemResetVars() {
+	Diablo2.MassItem.Start := {}
+	Diablo2.MassItem.Size := {}
+	Diablo2.MassItem.TopLeft := {}
 }
 
 /**
