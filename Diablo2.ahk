@@ -420,6 +420,7 @@ Diablo2_FillPotion() {
 	Diablo2_ClearScreen()
 	Diablo2_OpenInventory()
 	Diablo2_ShowBelt()
+	Diablo2_Send("{Shift down}")
 	Diablo2.FillPotion.Function.Call()
 }
 
@@ -964,11 +965,9 @@ Diablo2_Private_FillPotionClick(Coords) {
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
 
-	Diablo2_Send("{Shift down}")
 	; Click doesn't support expressions (at all)
 	X := Coords.X, Y := Coords.Y
 	Click, %X%, %Y%
-	Diablo2_Send("{Shift up}")
 	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
@@ -983,6 +982,7 @@ Diablo2_Private_FillPotionClick(Coords) {
  */
 Diablo2_Private_FillPotionEnd() {
 	Diablo2_Private_FillPotionLog("Finishing run")
+	Diablo2_Send("{Shift up}")
 	Diablo2_ClearScreen()
 }
 
