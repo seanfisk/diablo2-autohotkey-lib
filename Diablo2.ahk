@@ -464,7 +464,9 @@ Diablo2_FillPotionGenerateBitmaps() {
  */
 Diablo2_RightClick() {
 	LButtonIsDown := GetKeyState("LButton")
-	Click, Right
+	Diablo2_Send("{RButton down}")
+	KeyWait, RButton
+	Diablo2_Send("{RButton up}")
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
 	}
