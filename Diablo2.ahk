@@ -1,5 +1,6 @@
-#NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
-; Don't warn; libraries we include have too many errors :|
+#NoEnv
+; XXX WatchDirectory has some unset locals. Eventually would be nice to fix.
+#Warn, UseUnsetLocal, Off
 
 ; Set up CoordMode in the auto-execute section. Because of this,
 ; scripts which use this library MUST include it instead of just using
@@ -9,7 +10,7 @@
 ;     #Include <Diablo2>
 
 ; For windowed mode; doesn't affect fullscreen mode
-for _, Category in ["Pixel", "Mouse"] {
+for __, Category in ["Pixel", "Mouse"] {
 	CoordMode, %Category%, Client
 }
 ; Despite what the docs say, there appears to be no way to send clicks
@@ -860,8 +861,8 @@ Diablo2_Private_FillPotionReset(VoiceAlert := false) {
 		}
 		; Cache needle bitmaps
 		BitmapLoop:
-		For Type_, Sizes in Diablo2.FillPotion.Potions {
-			For _, Size in Sizes {
+		for Type_, Sizes in Diablo2.FillPotion.Potions {
+			for _, Size in Sizes {
 				Bitmap := Gdip_CreateBitmapFromFile(Diablo2_Private_FillPotionImagePath(Type_, Size))
 				if (Bitmap <= 0) {
 					Diablo2_Private_FillPotionLog("Needle bitmaps not found; please generate them first")
@@ -1229,6 +1230,7 @@ Diablo2_Private_MassItemHasSelection() {
  * Return value: None
  */
 Diablo2_Private_MassItemResetVars() {
+	global Diablo2
 	Diablo2.MassItem.Start := {}
 	Diablo2.MassItem.Size := {}
 	Diablo2.MassItem.TopLeft := {}
