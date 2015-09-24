@@ -1,17 +1,22 @@
 #NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
 ; Don't warn; libraries we include have too many errors :|
 
+; Set up CoordMode in the auto-execute section. Because of this,
+; scripts which use this library MUST include it instead of just using
+; the implicit import from the library of functions feature and MUST
+; NOT override CoordMode or SendMode. Use with:
+;
+;     #Include <Diablo2>
+
+; For windowed mode; doesn't affect fullscreen mode
+for _, Category in ["Pixel", "Mouse"] {
+	CoordMode, %Category%, Client
+}
+
 ; Each key binding is given in AutoHotkey syntax.
 ; See <http://ahkscript.org/docs/KeyList.htm>
 
 #Include <JSON>
-; Include these here, otherwise it will try to include at the end and mess up because of our labels.
-; It's hacky, but it seems to work.
-#Include <Gdip>
-#Include <sizeof>
-#Include <_Struct>
-#Include <WatchDirectory>
-#Include <Gdip_ImageSearch>
 
 /**************************************************************************************************
  * BEGIN PUBLIC FUNCTIONS
@@ -367,7 +372,7 @@ Diablo2_SkillOneOff(Key) {
 	LButtonIsDown := GetKeyState("LButton")
 	CurrentSkill := Diablo2_SkillGet()
 	Diablo2_SkillActivate(Key)
-	Diablo2_Send("{Click right}")
+	Diablo2_Send("{Click, Right}")
 	Diablo2_SkillActivate(CurrentSkill)
 	; There are probably times when this isn't necessary, but it's
 	; really useful, for example, to keep moving after performing a
@@ -414,9 +419,13 @@ Diablo2_FillPotionGenerateBitmaps() {
  *     Sequence of keys to send
  */
 Diablo2_Send(Keys) {
-	; Always use SendInput; it works well with Diablo II. We use this
-	; instead of SendMode because settings with SendMode get reset for
-	; each new thread.
+	; Always use SendInput; it works well with Diablo II. Using this
+	; function allows us to not to have to set SendMode in the
+	; auto-execute section. Although we're already using the
+	; auto-execute section for CoordMode, it's benefical not to have to
+	; set it in addition to the bonus that all keystrokes pass through
+	; this function, so we could potentially log, etc. in the future
+	; with no additional changes.
 	SendInput, %Keys%
 }
 
@@ -435,23 +444,23 @@ Diablo2_Send(Keys) {
  */
 Diablo2_RightClick() {
 	LButtonIsDown := GetKeyState("LButton")
-	Diablo2_Send("{Click right}")
+	Diablo2_Send("{Click, Right}")
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
 	}
 }
 
 /**
-* Convert a key in Hotkey syntax to Send syntax.
-* Currently, if the string is more than one character, we throw curly braces around it. I'm sure
-* this doesn't account for every possible case, but it seems to work.
-*
-* Arguments:
-* HotkeyString
-*     A key string in Hotkey syntax, i.e., with unescaped special keys (e.g. F1 instead of {F1}).
-*
-* Return value: The key in Send syntax.
-*/
+ * Convert a key in Hotkey syntax to Send syntax.
+ * Currently, if the string is more than one character, we throw curly braces around it. I'm sure
+ * this doesn't account for every possible case, but it seems to work.
+ *
+ * Arguments:
+ * HotkeyString
+ *     A key string in Hotkey syntax, i.e., with unescaped special keys (e.g. F1 instead of {F1}).
+ *
+ * Return value: The key in Send syntax.
+ */
 Diablo2_HotkeySyntaxToSendSyntax(HotkeyString) {
 	if (StrLen(HotkeyString) > 1) {
 		return "{" HotkeyString "}"
@@ -772,32 +781,19 @@ Diablo2_Private_FillPotionImagePath(Type_, Size) {
  * Perform a click to insert a potion into the belt.
  *
  * Arguments:
- * X
- *     X coordinate of the intended click
- * Y
- *     Y coordinate of the intended click
+ * Coords
+ *     The coordinates of the intended click
  *
  * Return value: None
  */
-Diablo2_Private_FillPotionClick(X, Y) {
+Diablo2_Private_FillPotionClick(Coords) {
 	; The sleeps here are totally emperical. Just seems to work best this way.
 	Sleep, 150
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
-	; The following code *should* work with or without SendMode, Input
-	; on since Diablo2_Send() uses SendInput. But it doesn't work with
-	; either! SendInput seems to be sending all its mouse clicks and
-	; moves with SendEvent.
 
-	; Using Diablo2_Send avoids having to change the SendMode for
-	; Click/MouseMove. The 0 argument to the last Click says to move
-	; only, not click.
-	;Diablo2_Send(Format("{{}Click {}, {}{}}{{}Click, {}, {}, 0{}}"
-	;	, X, Y, MouseX, MouseY))
-
-	; Click doesn't support expressions (at all). Hence the use of X and Y above...
-	Click, %X%, %Y%
-	MouseMove, MouseX, MouseY
+	; Click with a last argument of 0 just moves the mouse.
+	Diablo2_Send("{}}{Click, {}, {}{}}{{}Click, {}, {}, 0{}}", Coords.X, Coords.Y, MouseX, MouseY)
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
 	}
@@ -838,12 +834,6 @@ Diablo2_Private_FillPotionLogWithSize(Type_, Size, Message) {
 Diablo2_Private_FillPotionWindowed() {
 	global Diablo2
 
-	; Reset CoordMode and SendMode for this thread.
-	for _, Category in ["Pixel", "Mouse"] {
-		CoordMode, %Category%, Client
-	}
-	SendMode, Input
-
 	for Type_, Sizes in Diablo2.FillPotion.Potions {
 		LastPotion := {X: -1, Y: -1}
 		WindowedSizeLoop:
@@ -858,13 +848,14 @@ Diablo2_Private_FillPotionWindowed() {
 				if (ErrorLevel == 1) {
 					break ; Image not found on the screen.
 				}
-				if (LastPotion.X == PotionX and LastPotion.Y == PotionY) {
+				Potion := {X: PotionX, Y: PotionY}
+				if (LastPotion.X == Potion.X and LastPotion.Y == Potion.Y) {
 					Diablo2_Private_FillPotionLogWithType(Type_, "Finished for run due to full belt")
 					break, WindowedSizeLoop
 				}
-				Diablo2_Private_FillPotionLogWithSize(Type_, Size, Format("Clicking {1},{2}", PotionX, PotionY))
-				Diablo2_Private_FillPotionClick(PotionX, PotionY)
-				LastPotion := {X: PotionX, Y: PotionY}
+				Diablo2_Private_FillPotionLogWithSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
+				Diablo2_Private_FillPotionClick(Potion)
+				LastPotion := Potion
 			}
 		}
 		if (LastPotion.X == -1) {
@@ -925,9 +916,6 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 	; Both the "from" and "to" paths will be populated for FILE_NOTIFY_CHANGE_LAST_WRITE, but
 	; we'll just use the latter.
 	global Diablo2
-
-	; Reset SendMode for this thread.
-	SendMode, Input
 
 	Diablo2_Private_FillPotionLog("Processing " . HaystackPath)
 
@@ -991,7 +979,7 @@ Diablo2_Private_FillPotionFullscreen(_1, _2, HaystackPath) {
 			Loop, % NumPotionsToClick {
 				Potion := PotionsFound[A_Index]
 				Diablo2_Private_FillPotionLogWithSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
-				Diablo2_Private_FillPotionClick(Potion.X, Potion.Y)
+				Diablo2_Private_FillPotionClick(Potion)
 				PotionsClicked.Push(Potion)
 			}
 

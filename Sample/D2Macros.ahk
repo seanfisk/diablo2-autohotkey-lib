@@ -1,14 +1,13 @@
-; Recommended for performance and compatibility with future AutoHotkey
-; releases.
-#NoEnv
-; Replace an old instance of the macros with a new one.
-#SingleInstance Force
-; Allow AutoHotkey to find the config files in this directory.
-SetWorkingDir %A_ScriptDir%
-
 ; AutoHotkey uses the name of script in the system tray. We name the
 ; script D2Macros so that its purpose is obvious when looking in the
 ; tray.
+
+; Replace an old instance of the macros with a new one.
+#SingleInstance Force
+; Allow the library to find the config files in this directory.
+SetWorkingDir %A_ScriptDir%
+
+#Include <Diablo2>
 
 ; Initialize the macros by giving the paths to the configuration
 ; files.
