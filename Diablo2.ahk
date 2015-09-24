@@ -399,6 +399,8 @@ Diablo2_SkillOneOff(Key) {
 	; Teleport. It's useful enough that it's included as the default
 	; behavior.
 	if (LButtonIsDown) {
+		; SendInput is so fast that the game needs time to react.
+		Sleep, 20
 		Diablo2_Send("{LButton down}")
 	}
 }
