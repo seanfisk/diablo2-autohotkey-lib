@@ -966,7 +966,8 @@ Diablo2_Private_FillPotionClick(Coords) {
 
 	Diablo2_Send("{Shift down}")
 	; Click doesn't support expressions (at all)
-	X := Coords.X, Y := Coords.Y, Click, %X%, %Y%
+	X := Coords.X, Y := Coords.Y
+	Click, %X%, %Y%
 	Diablo2_Send("{Shift up}")
 	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
