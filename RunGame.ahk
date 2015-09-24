@@ -1,4 +1,3 @@
-﻿#NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
-#Warn  ; Enable warnings to assist with detecting common
+#Include <Diablo2>
 
 Diablo2_StartGame()
