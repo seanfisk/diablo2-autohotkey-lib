@@ -12,6 +12,26 @@
 for _, Category in ["Pixel", "Mouse"] {
 	CoordMode, %Category%, Client
 }
+; Despite what the docs say, there appears to be no way to send clicks
+; using SendInput other than the following:
+;
+;     SendMode, Input
+;     Click, X, Y
+;
+; I believe this is a bug in AutoHotkey. See
+; 'source/keyboard_mouse.cpp' in the AutoHotkey source tree for more
+; details on when SendInput falls back to other methods.
+;
+; Here are other options we've tried that don't work:
+;
+;     SendInput, {Click X, Y}
+;
+;     SendMode, Input
+;     SendInput, {Click X, Y}
+;
+;     SendMode, Input
+;     Send, {Click X, Y}
+SendMode, Input
 
 ; Each key binding is given in AutoHotkey syntax.
 ; See <http://ahkscript.org/docs/KeyList.htm>
@@ -372,7 +392,7 @@ Diablo2_SkillOneOff(Key) {
 	LButtonIsDown := GetKeyState("LButton")
 	CurrentSkill := Diablo2_SkillGet()
 	Diablo2_SkillActivate(Key)
-	Diablo2_Send("{Click, Right}")
+	Click, Right
 	Diablo2_SkillActivate(CurrentSkill)
 	; There are probably times when this isn't necessary, but it's
 	; really useful, for example, to keep moving after performing a
@@ -394,7 +414,6 @@ Diablo2_FillPotion() {
 	Diablo2_ClearScreen()
 	Diablo2_OpenInventory()
 	Diablo2_ShowBelt()
-	Diablo2_Send("{Shift down}")
 	Diablo2.FillPotion.Function.Call()
 }
 
@@ -412,20 +431,21 @@ Diablo2_FillPotionGenerateBitmaps() {
 }
 
 /**
- * Send keys or clicks in our specific format.
+ * Send keys in our specific format.
+ *
+ * Note: Do not use this method to click! See auto-execute section
+ * (top of this file) for an explanation.
  *
  * Arguments:
  * Keys
  *     Sequence of keys to send
  */
-Diablo2_Send(Keys) {
-	; Always use SendInput; it works well with Diablo II. Using this
-	; function allows us to not to have to set SendMode in the
-	; auto-execute section. Although we're already using the
-	; auto-execute section for CoordMode, it's benefical not to have to
-	; set it in addition to the bonus that all keystrokes pass through
-	; this function, so we could potentially log, etc. in the future
-	; with no additional changes.
+ Diablo2_Send(Keys) {
+	; In the past, we attempted to use this function to send all keys
+	; using SendInput so we didn't have to set SendMode. Well, that
+	; didn't work (see top of file). But it's benefical that all
+	; keystrokes pass through this function, so we could potentially
+	; log, etc. in the future with no additional changes.
 	SendInput, %Keys%
 }
 
@@ -444,7 +464,7 @@ Diablo2_Send(Keys) {
  */
 Diablo2_RightClick() {
 	LButtonIsDown := GetKeyState("LButton")
-	Diablo2_Send("{Click, Right}")
+	Click, Right
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
 	}
@@ -792,8 +812,13 @@ Diablo2_Private_FillPotionClick(Coords) {
 	MouseGetPos, MouseX, MouseY
 	LButtonIsDown := GetKeyState("LButton")
 
-	; Click with a last argument of 0 just moves the mouse.
-	Diablo2_Send("{}}{Click, {}, {}{}}{{}Click, {}, {}, 0{}}", Coords.X, Coords.Y, MouseX, MouseY)
+	; Click doesn't support expressions (at all)
+	X := Coords.X
+	Y := Coords.Y
+	Diablo2_Send("{Shift down}")
+	Click, %X%, %Y%
+	Diablo2_Send("{Shift up}")
+	MouseMove, MouseX, MouseY
 	if (LButtonIsDown) {
 		Diablo2_Send("{LButton down}")
 	}
@@ -807,7 +832,6 @@ Diablo2_Private_FillPotionClick(Coords) {
  */
 Diablo2_Private_FillPotionEnd() {
 	Diablo2_Private_FillPotionLog("Finishing run")
-	Diablo2_Send("{Shift up}")
 	Diablo2_ClearScreen()
 }
 
