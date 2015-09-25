@@ -42,7 +42,7 @@ RButton::Diablo2_RightClick()
 6::Diablo2_MassItemSelectStart()
 7::Diablo2_MassItemSelectEnd()
 8::Diablo2_MassItemDrop()
-9::Diablo2_MoveSingleCellItems()
+9::Diablo2_MassItemMoveSingleCellItems()
 
 ; Activate the following hotkeys in any application.
 #IfWinActive
