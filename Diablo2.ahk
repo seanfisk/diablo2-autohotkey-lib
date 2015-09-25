@@ -139,7 +139,7 @@ Diablo2_Reset(Action := "reset") {
 			if (Key != "") {
 				Diablo2.Skills.WeaponSetForKey[Key] := WeaponSetForSkill[A_Index]
 				; Make each skill a hotkey so we can track the current skill.
-				Hotkey, %Key%, SkillHotkeyActivated
+				Hotkey, %Key%, Diablo2_Private_SkillHotkeyActivated
 			}
 		}
 
@@ -800,6 +800,15 @@ Diablo2_Private_SkillsLog(Message) {
 	Diablo2_Log("Skills" . Diablo2.Log.Sep . Message)
 }
 
+/**
+ * Activate the skill represented by the assigned hotkey.
+ *
+ * Return value: None
+ */
+Diablo2_Private_SkillHotkeyActivated() {
+	Diablo2_SkillActivate(A_ThisHotkey)
+}
+
 Diablo2_Private_MassItemLog(Message, Level := "DEBUG") {
 	global Diablo2
 	Diablo2_Log("MassItem" . Diablo2.Log.Sep . Message, Level)
@@ -1281,12 +1290,3 @@ Diablo2_Private_Shutdown() {
 		Diablo2.Log.FileObj.Close()
 	}
 }
-
-goto, End
-
-; Handle all skill hotkeys with a preferred weapon set.
-SkillHotkeyActivated:
-Diablo2_SkillActivate(A_ThisHotkey)
-return
-
-End:
