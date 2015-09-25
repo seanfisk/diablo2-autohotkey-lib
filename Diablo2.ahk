@@ -102,9 +102,11 @@ Diablo2_Reset(Action := "reset") {
 	; Set up voice
 	if (Diablo2.Voice.Enable) {
 		Diablo2.Voice.SpVoice := ComObjCreate("SAPI.SpVoice")
+		; Up the rate a bit (default is 0)
+		Diablo2.Voice.SpVoice.Rate := 3
+		; Prefer Hazel (case-insensitive) because I like her voice :)
 		Voices := Diablo2.Voice.SpVoice.GetVoices
 		Loop, % Voices.Count {
-			; Prefer Hazel (case-insensitive) because I like her voice :)
 			Voice := Voices.Item(A_Index - 1)
 			if InStr(Voice.GetAttribute("Name"), "Hazel", false) {
 				Diablo2.Voice.SpVoice.Voice := Voice
