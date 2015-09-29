@@ -903,6 +903,10 @@ class Diablo2 {
 				}
 			}
 			this._InitBitmaps()
+			if (!this._HasBitmaps) {
+				this._Log("Needle bitmaps not found; please generate them first")
+				Diablo2.Voice.Speak("Please generate potion bitmaps")
+			}
 		}
 
 		__Delete() {
@@ -970,7 +974,9 @@ class Diablo2 {
 					this._Log("Enabled")
 				}
 				else {
-					Diablo2.Fatal("Bitmap generation succeeded but bitmaps still not found")
+					Message := "Bitmaps still not found"
+					Diablo2.Voice.Speak(Message . ",  check log for details", true)
+					Diablo2.Fatal(Message)
 				}
 			}
 		}
@@ -1021,15 +1027,13 @@ class Diablo2 {
 		; Check for and initialize bitmaps.
 		_InitBitmaps() {
 			BitmapPaths := {}
-BitmapLoop:
 			for Type_, Sizes in this._Potions {
 				for _, Size in Sizes {
 					Path := this._ImagePath(Type_, Size)
 					if (!FileExist(Path)) {
-						this._Log("Needle bitmaps not found; please generate them first")
-						Diablo2.Voice.Speak("Please generate potion bitmaps")
 						this._HasBitmaps := false
-						break, BitmapLoop
+						this._Function := ObjBindMethod(this, "_NoBitmaps")
+						return
 					}
 					BitmapPaths[Type_, Size] := Path
 				}
@@ -1043,10 +1047,7 @@ BitmapLoop:
 				}
 			}
 			; Assign function
-			this._Function := ObjBindMethod(this
-				, this._HasBitmaps
-					? (this._Fullscreen ? "_FullscreenBegin" : "_Windowed")
-					: "_NoBitmaps")
+			this._Function := ObjBindMethod(this, this._Fullscreen ? "_FullscreenBegin" : "_Windowed")
 		}
 
 		; Return the potion image path for a specified type and size.
