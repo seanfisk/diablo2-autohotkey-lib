@@ -918,11 +918,6 @@ class Diablo2 {
 
 		; Fill the potion belt.
 		Activate() {
-			this._Log(Format("Starting {} run", this._Fullscreen ? "fullscreen" : "windowed"))
-			Diablo2.ClearScreen()
-			Diablo2.OpenInventory()
-			Diablo2.ShowBelt()
-			Diablo2.Send("{Shift down}")
 			this._Function.Call()
 		}
 
@@ -1103,6 +1098,15 @@ class Diablo2 {
 			Sleep, 150
 		}
 
+		; Perform starting tasks for a FillPotion run.
+		_Begin() {
+			this._Log(Format("Starting {} run", this._Fullscreen ? "fullscreen" : "windowed"))
+			Diablo2.ClearScreen()
+			Diablo2.OpenInventory()
+			Diablo2.ShowBelt()
+			Diablo2.Send("{Shift down}")
+		}
+
 		; End potion belt insertion and clear the screen.
 		_End() {
 			this._Log("Finishing run")
@@ -1120,6 +1124,7 @@ class Diablo2 {
 
 		; Fill the potion belt in windowed mode.
 		_Windowed() {
+			this._Begin()
 			for Type_, Sizes in this._Potions {
 				LastPotion := {X: -1, Y: -1}
 WindowedSizeLoop:
@@ -1156,6 +1161,7 @@ WindowedSizeLoop:
 
 		; Begin filling the potion belt in fullscreen mode.
 		_FullscreenBegin() {
+			this._Begin()
 			; Initialize structures
 			for Type_ in this._Potions {
 				this["_FullscreenState", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
