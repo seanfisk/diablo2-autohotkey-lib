@@ -7,7 +7,10 @@
 [CmdletBinding()]
 Param(
 	[Parameter(Mandatory=$true, Position=1)]
-	[string]$ScreenshotPath
+	[String]$ScreenshotPath,
+	[Parameter(Mandatory=$true, Position=2)]
+	[ValidateSet("Windowed", "Fullscreen")]
+	[String]$WindowType
 )
 
 # Enforce best practices.
@@ -69,7 +72,7 @@ $Coords['Rejuvenation'] = @{
 	'Full' = @(454, 382, 12, 18);
 }
 # Again, we need an absolute path for passing to .NET.
-$ImagesDir = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) Images))
+$ImagesDir = [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-Location) Images) $WindowType))
 EnsureDir($ImagesDir)
 foreach ($TypeItem in $Coords.GetEnumerator()) {
 	$Type = $TypeItem.Name

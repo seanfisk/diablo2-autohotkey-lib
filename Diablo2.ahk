@@ -945,6 +945,7 @@ class Diablo2 {
 			this._Log("Running bitmap generation script")
 			ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
 			LogPath := A_WorkingDir . "\GenerateBitmaps.log"
+			WindowType := this._Fullscreen ? "Fullscreen" : "Windowed"
 			; Don't use -File: https://connect.microsoft.com/PowerShell/feedback/details/750653/powershell-exe-doesn-t-return-correct-exit-codes-when-using-the-file-option
 			;
 			; The goal is to capture stdout and stderr. RunWait internally uses Wscript.Shell.Run, which
@@ -952,7 +953,7 @@ class Diablo2 {
 			; but raises a PowerShell console, kicking a fullscreen user to the desktop when it runs. This
 			; isn't acceptable, so in lieu of complicated solutions that would drop down to
 			; CreateProcess(), we've just decided to write to a temporary file.
-			RunWait, powershell -NoLogo -NonInteractive -NoProfile -Command "Start-Transcript '%LogPath%'; & '%ScriptPath%' -Verbose '%ScreenshotPath%'; Stop-Transcript", %A_WorkingDir%, Hide
+			RunWait, powershell -NoLogo -NonInteractive -NoProfile -Command "Start-Transcript '%LogPath%'; & '%ScriptPath%' -Verbose '%ScreenshotPath%' '%WindowType%'; Stop-Transcript", %A_WorkingDir%, Hide
 			ExitCode := ErrorLevel
 
 			; Remove the screen shot; it is not needed any more.
@@ -1060,7 +1061,10 @@ class Diablo2 {
 		;
 		; Returns: the image path
 		_ImagePath(Type_, Size) {
-			return Format("{1}\Images\{2}\{3}.png", A_WorkingDir, Type_, Size)
+			return Format("{}\Images\{}\{}\{}.png"
+				, A_WorkingDir
+				, this._Fullscreen ? "Fullscreen" : "Windowed"
+				, Type_, Size)
 		}
 
 		; Safely create a bitmap from a file.
