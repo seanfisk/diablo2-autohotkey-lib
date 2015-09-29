@@ -969,6 +969,9 @@ class Diablo2 {
 					Diablo2.Voice.Speak(this.Name . " enabled")
 					this._Log("Enabled")
 				}
+				else {
+					Diablo2.Fatal("Bitmap generation succeeded but bitmaps still not found")
+				}
 			}
 		}
 
