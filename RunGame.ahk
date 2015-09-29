@@ -1,3 +1,3 @@
 #Include <Diablo2>
 
-Diablo2_StartGame()
+Diablo2.StartGame()
