@@ -1018,7 +1018,7 @@ class Diablo2 {
 		; Check for and initialize bitmaps.
 		_InitBitmaps() {
 			BitmapPaths := {}
-	BitmapLoop:
+BitmapLoop:
 			for Type_, Sizes in this._Potions {
 				for _, Size in Sizes {
 					Path := this._ImagePath(Type_, Size)
@@ -1114,14 +1114,14 @@ class Diablo2 {
 		_Windowed() {
 			for Type_, Sizes in this._Potions {
 				LastPotion := {X: -1, Y: -1}
-	WindowedSizeLoop:
+WindowedSizeLoop:
 				for _, Size in Sizes {
 					NeedlePath := this._ImagePath(Type_, Size)
 					Loop {
 						ImageSearch, PotionX, PotionY
-						, % Diablo2.Inventory.TopLeft.X, % Diablo2.Inventory.TopLeft.Y
-						, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y
-						, % Format("*{} {}", this._Variation, NeedlePath)
+							, % Diablo2.Inventory.TopLeft.X, % Diablo2.Inventory.TopLeft.Y
+							, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y
+							, % Format("*{} {}", this._Variation, NeedlePath)
 						if (ErrorLevel == 2) {
 							Diablo2.Voice.Speak("Fill potion error", false)
 							Diablo2.Fatal("Needle image file not found: " . NeedlePath)
@@ -1181,7 +1181,7 @@ class Diablo2 {
 					continue
 				}
 				PotionsClicked := []
-				PotionSizeLoop:
+PotionSizeLoop:
 				Loop {
 					Size := Sizes[this._FullscreenState[Type_].SizeIndex]
 					this._LogWithSize(Type_, Size, "Searching")
