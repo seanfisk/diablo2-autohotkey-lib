@@ -28,6 +28,7 @@ Diablo2.Init("Controls.json"
 Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 		, "^!b": "FillPotion.GenerateBitmaps"
 		, "^!r": "Reset"
+		, "^!t": "Status"
 		; Just 'f' runs FillPotion.
 		, "f": "FillPotion.Activate"
 		; Enable the right-click fix globally.

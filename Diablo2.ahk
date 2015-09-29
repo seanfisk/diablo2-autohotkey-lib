@@ -134,6 +134,34 @@ class Diablo2 {
 		}
 	}
 
+	; Report status of the macros.
+	Status() {
+		this.Log.Message("Global", "Logging status report")
+		HotkeysActive := "Hotkeys " . (A_IsSuspended ? "Suspended" : "Active")
+		Diablo2.Log.Message("Global", HotkeysActive)
+		SpeakStr := HotkeysActive
+		FeaturesByStatus := {Enabled: [], Disabled: []}
+		for Name, Feature in this._Features {
+			Enabled := Feature.Enabled ? "Enabled" : "Disabled"
+			FeaturesByStatus[Enabled].Push(Name)
+			this.Log.Message(Name, Enabled_)
+		}
+		SpeakStr := HotkeysActive
+		for _1, Enabled in ["Enabled", "Disabled"] {
+			SpeakStr .= Format(", {} features", Enabled)
+			Features := FeaturesByStatus[Enabled]
+			if (Features.Length() > 0) {
+				for _2, Feature in Features {
+					SpeakStr .= ", " . Feature
+				}
+			}
+			else {
+				SpeakStr .= ", None"
+			}
+		}
+		Diablo2.Voice.Speak(SpeakStr)
+	}
+
 	; Reset the state of the macros.
 	Reset() {
 		this.Voice.Speak("Macros reset", true)
