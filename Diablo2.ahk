@@ -671,7 +671,7 @@ class Diablo2 {
 			; behavior.
 			if (LButtonIsDown) {
 				; SendInput is so fast that the game needs time to react.
-				Sleep, 20
+				Sleep, 50
 				Diablo2.Send("{LButton down}")
 			}
 		}
