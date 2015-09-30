@@ -46,16 +46,20 @@ class Diablo2 {
 		, BottomRight: {X: 710, Y: 435}
 	, CellSize: 29}
 	static RegistryKey := "HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II"
-	; Use an object for HasKey because arrays don't have a Contains-type method presumably, HasKey
-	; operates in O(1) and would be faster than writing our own Contains.
 
 	; Private constants
 	static _OptionalFeaturesDisabledClasses := {Log: "Noop"
 		, Voice: "Noop"
 		, Skills: "ExitThread"
 		, MassItem: "ExitThread"
-		, FillPotion: "ExitThread"}
-	static _SuspensionExempt := {"Suspend": "", "Exit": ""}
+		, FillPotion: "ExitThread"
+		, Steam: "ExitThread"}
+	; Use an object for HasKey because arrays don't have a Contains-type method presumably, HasKey
+	; operates in O(1) and would be faster than writing our own Contains.
+	static _SuspensionExempt := {"Suspend": ""
+		, "Exit": ""
+		, "Steam.OverlayToggle": ""
+		, "Steam.BrowserOpenTabs": ""}
 
 	; Private vars
 	static _Features := {}
@@ -105,7 +109,7 @@ class Diablo2 {
 	Assign(Key, Binding, GameOnly := true) {
 		if (IsObject(Binding)) {
 			if (!(Binding.HasKey("Function") and Binding.HasKey("Args"))) {
-				Diablo2.Fatal("Incorrect object passed to Diablo2.Assign(...)")
+				Diablo2.Fatal("Invalid object passed to Diablo2.Assign(...)")
 			}
 			Function := Binding.Function
 			Args := Binding.Args
@@ -122,8 +126,12 @@ class Diablo2 {
 			Hotkey, IfWinActive, % this.HotkeyCondition
 		}
 		if (this._SuspensionExempt.HasKey(Function)) {
-			; Due to AHK limitations, "Suspend, *" doesn't work in a function reference.
-			Function := "_Diablo2_" . Function
+			; Due to AHK limitations, "Suspend, *" doesn't work in a function reference. A suspension
+			; exempt function therefore cannot support arguments.
+			if (Args.Length() > 0) {
+				Diablo2.Fatal("Arguments not supported for suspend permit function " . Function)
+			}
+			Function := "_Diablo2_" . StrReplace(Function, ".", "_")
 		}
 		else {
 			Components := StrSplit(Function, ".")
@@ -135,7 +143,7 @@ class Diablo2 {
 				}
 				Obj := Obj[Component]
 			}
-			Function := ObjBindMethod(Obj, MethodName, Args)
+			Function := ObjBindMethod(Obj, MethodName, Args*)
 		}
 		Hotkey, %Key%, %Function%
 		if (GameOnly) {
@@ -264,18 +272,13 @@ class Diablo2 {
 		BlockInput, %Mode%
 	}
 
-	; Run the game with the command-line flag -skiptobnet, which starts the game right at the
-	; Battle.Net login screen. Calling this in your personal macro file is optional.
-	StartGame() {
-		; XXX: Don't use CmdLine from the registry -- the game modifies this
-		; when run. When we pass -skiptobnet, it adds this to CmdLine,
-		; too... not sure how to avoid this.
-		RegRead, GamePath, % this.RegistryKey, GamePath
-		SplitPath, GamePath, , GameDir
-		Run, "%GamePath%" -skiptobnet, %GameDir%
-		; We considered saving the PID from this and using ahk_pid to limit hotkeys to that, but it's
-		; adding unnecessary complexity. There can be only one Diablo II instance running at a time
-		; anyway.
+	; Run the game, disabling the macros until the user has joined a game.
+	;
+	; Also see Steam.LaunchGame() for launching the game through Steam (which enables the Steam
+	; overlay).
+	LaunchGame() {
+		this._RunGame()
+		this._SuspendUntilGameJoined()
 	}
 
 	; Open the inventory.
@@ -359,6 +362,33 @@ class Diablo2 {
 	; Return the maximum of two parameters.
 	_Max(A, B) {
 		return A > B ? A : B
+	}
+
+	; Run the game with the command-line flag -skiptobnet, which starts the game right at the
+	; Battle.Net login screen. Used by the RunGame.ahk wrapper.
+	_RunGame() {
+		; XXX: Don't use CmdLine from the registry -- the game modifies this
+		; when run. When we pass -skiptobnet, it adds this to CmdLine,
+		; too... not sure how to avoid this.
+		RegRead, GamePath, % this.RegistryKey, GamePath
+		SplitPath, GamePath, , GameDir
+		Run, "%GamePath%" -skiptobnet, %GameDir%
+		; We considered saving the PID from this and using ahk_pid to limit hotkeys to that, but it's
+		; adding unnecessary complexity. There can be only one Diablo II instance running at a time
+		; anyway.
+	}
+
+	; Suspend hotkeys until the user logs into Battle.Net and joins a game.
+	_SuspendUntilGameJoined() {
+		; Suspend immediately, because the user will have to type in credentials for Battle.Net.
+		_Diablo2_Suspend("On")
+		; Wait for Battle.Net login, character choice, and game creation/join
+		Loop, 3 {
+			; Down (D) and up (the default) constitutes an individual press
+			KeyWait, Enter, D
+			KeyWait, Enter
+		}
+		_Diablo2_Suspend("Off")
 	}
 
 	; Private classes
@@ -1324,6 +1354,44 @@ PotionSizeLoop:
 			}
 		}
 	}
+
+	class _SteamFeature extends Diablo2._EnabledFeature {
+		; Default overlay key for Steam
+		_OverlayKey := "^Tab"
+		_BrowserTabUrls := ["http://blizzard.com/diablo2/"]
+
+		__New(Config) {
+			; We want Steam.BrowserOpenTabs() to run under suspension because hotkeys should be suspended
+			; when the overlay is open. Because Suspend, Permit does not work in function references, a
+			; hotkey which calls a Suspend, Permit function cannot accept arguments. We therefore have to
+			; accept BrowserTabs as a configuration option instead of an argument to
+			; Steam.BrowserOpenTabs().
+			for _, Key in ["OverlayKey", "BrowserTabUrls"] {
+				if (Config.HasKey(Key)) {
+					this["_" . Key] := Config[Key]
+				}
+			}
+		}
+
+		; Launch the game through Steam. You can set up this feature by following these steps:
+		;
+		; 1. Open the Steam Library.
+		; 2. Click ADD A GAME... -> Add a Non-Steam Game...
+		; 3. Click BROWSE... and navigate to Documents\AutoHotkey\Lib within your home directory.
+		; 4. Select Diablo II.exe. This is an AHK wrapper around running the actual game.
+		; 5. Back in the Library, right-click Diablo II -> Create Desktop Shortcut.
+		; 6. On the desktop, right-click the shortcut and choose Properties. Copy the URL into your
+		;    macros.
+		;
+		; Parameters:
+		; GameUrl
+		;     The URL to run the game through Steam
+		LaunchGame(GameUrl) {
+			this._Log("Running game with Url " . GameUrl)
+			Run, %GameUrl%
+			Diablo2._SuspendUntilGameJoined()
+		}
+	}
 }
 
 ; Any functions that should be able to be activated when hotkeys are suspended need to be outside
@@ -1347,6 +1415,56 @@ _Diablo2_Exit() {
 	Suspend, Permit
 	Diablo2.Voice.Speak("Exiting", true)
 	ExitApp
+}
+
+; Toggle the Steam overlay.
+_Diablo2_Steam_OverlayToggle() {
+	Suspend, Permit
+	_Diablo2_Suspend()
+	Diablo2.Send(Diablo2.Steam._OverlayKey)
+}
+
+; Open tabs in the Steam Web Browser. First, provide the Steam feature a list of tab URLs you would
+; like opened. Then assign this function to a hotkey. Next, open the web browser and position your
+; mouse over the URL bar. Then press the hotkey to load the tabs.
+;
+; Note: This function is best-effort. The Steam Web Browser (and overlay in general) can be very
+; finicky and sometimes this function does not want to work correctly.
+;
+; Parameters:
+; TabUrls
+;     List of strings representing URLs to open in the browser
+_Diablo2_Steam_BrowserOpenTabs() {
+	Suspend, Permit
+
+	; Grab the mouse's position over the URL bar.
+	MouseGetPos, MouseX, MouseY
+
+	; Ensure we are suspended.
+	Suspend, On
+
+	for _, Url in Diablo2.Steam._BrowserTabUrls {
+		; Use SendEvent to enable delays. Change the key press delay for keystrokes using SendEvent
+		; because the Steam overlay is laggy in detecting them. Without this, keys will be dropped.
+		;
+		; This sets the key delay only for this thread, so we don't need to worry about setting it
+		; back. Hopefully the user assigned this to a hotkey as suggested.
+		SetKeyDelay, 0, 100
+		SendEvent, ^t
+
+		; Click where the user had the mouse.
+		Click, %MouseX%, %MouseY%
+		Sleep, 100
+		SetKeyDelay, 0, 2
+		SendEvent, {Raw}%Url%
+		SendEvent, {Enter}
+		; Let the tab load a bit. If we don't do this, the tab usually ends up in error.
+		Sleep, 150
+	}
+
+	; Don't resume hotkeys because we are still in the overlay. If the user is using the Steam
+	; macros, hotkeys are hopefully suspended before this function started executing, so leave
+	; them suspended.
 }
 
 ; Wrapper for WatchDirectory callback.

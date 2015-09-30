@@ -9,6 +9,15 @@ SetWorkingDir %A_ScriptDir%
 
 #Include <Diablo2>
 
+; Build a list of tab URLs to open in the Steam overlay web browser.
+GetTabUrls() {
+	TabUrls := []
+	for _, WikiPage in ["Horadric_Cube_Recipes", "Rune_Words"] {
+		TabUrls.Push(Format("http://diablo.gamepedia.com/{}_%28Diablo_II%29", WikiPage))
+	}
+	return TabUrls
+}
+
 ; Initialize the macros by giving the paths to the configuration
 ; files.
 Diablo2.Init("Controls.json"
@@ -21,7 +30,9 @@ Diablo2.Init("Controls.json"
 		, Voice: {}
 		, Skills: "Skills.json"
 		, MassItem: {}
-		, FillPotion: {Fullscreen: true}})
+		, FillPotion: {Fullscreen: true}
+		; Enable Steam feature; Ctrl-Tab for the overlay is the default for Steam and for these macros.
+		, Steam: {OverlayKey: "^Tab", BrowserTabUrls: GetTabUrls()}})
 
 ; Ctrl+Alt+a to auto-configure controls.
 ; '^' is Control, '!' is Alt, and 'a' is the a key.
@@ -37,7 +48,11 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 		, "6": "MassItem.SelectStart"
 		, "7": "MassItem.SelectEnd"
 		, "8": "MassItem.Drop"
-		, "9": "MassItem.MoveSingleCellItems"}
+		, "9": "MassItem.MoveSingleCellItems"
+		; Control + Middle mouse button toggles the Steam overlay
+		, "^MButton": "Steam.OverlayToggle",
+		; Open tabs in the Steam overlay web browser.
+		, "^!w": "Steam.BrowserOpenTabs"}
 	; Means activate in the game only.
 	, true)
 
@@ -52,6 +67,11 @@ Diablo2.Assign(Key, {Function: "Skills.OneOff", Args: [Key]}, true)
 ; use a hotkey that won't be used in any applications globally.
 Diablo2.AssignMultiple({"^!s": "Suspend"
 		; Quit the macros
-		, "^!x": "Exit"}
+		, "^!x": "Exit"
+		; Launch the game (no Steam)
+		, "^!k": "LaunchGame"
+		; Launch the game (with Steam)
+		; IMPORTANT: You must replace the URL with your own Steam rungameid URL. See the README for instructions.
+		, "^!l": {Function: "Steam.LaunchGame", Args: ["steam://rungameid/xxxxxxxxxxxxxxxxxxxx"]}}
 	; Means activate in any application.
 	, false)
