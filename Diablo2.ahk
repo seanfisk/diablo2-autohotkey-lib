@@ -528,6 +528,12 @@ class Diablo2 {
 			}
 
 			KeyFunctions := {}
+			; Wait for all modifiers to be released. If they are down, it can cause interference.
+			for _, Modifier in ["LWin", "RWin", "Control", "Alt", "Shift"] {
+				if (GetKeyState(Modifier)) {
+					KeyWait, %Modifier%
+				}
+			}
 			SendStr := ""
 			for _, Control_ in FlatControls {
 				Function := Control_.Function
