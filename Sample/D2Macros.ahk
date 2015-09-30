@@ -44,7 +44,7 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 ; Assign Town Portal to F8 in the game. Now F8 will activate Town Portal, use it, and switch back to
 ; the last skill.
 Key := "F8"
-Diablo2.Assign(Key, {Function: "Skills.OneOff", Args: [Key]})
+Diablo2.Assign(Key, {Function: "Skills.OneOff", Args: [Key]}, true)
 
 ; These hotkeys should be activated in any application.
 ;
