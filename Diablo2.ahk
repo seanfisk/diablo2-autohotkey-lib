@@ -527,16 +527,15 @@ class Diablo2 {
 				CurrentIndex += 1
 			}
 
-			Suspend, On
-
 			KeyFunctions := {}
+			SendStr := ""
 			for _, Control_ in FlatControls {
 				Function := Control_.Function
 				Key := Control_.Key
 
 				; If "" (corresponding to "" or null in the JSON file), delete the binding.
 				if (Key == "") {
-					Diablo2.Send("{Delete}")
+					SendStr .= "{Delete}"
 				}
 				else {
 					; Check for duplicates
@@ -550,12 +549,12 @@ class Diablo2 {
 					KeyFunctions[Key] := Function
 
 					; Assign the key binding
-					Diablo2.Send("{Enter}" . Diablo2.HotkeySyntaxToSendSyntax(Key))
+					SendStr .= "{Enter}" . Diablo2.HotkeySyntaxToSendSyntax(Key)
 				}
-				Diablo2.Send("{Down}")
+				SendStr .= "{Down}"
 			}
 
-			Suspend, Off
+			Diablo2.Send(SendStr)
 
 			this._Log("Controls assigned")
 		}
