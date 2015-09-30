@@ -79,17 +79,41 @@ class Diablo2 {
 		this._Init()
 	}
 
-	; Assign a hotkey to a library function. This is a wrapper around the Hotkey command intended to
-	; make assignment of hotkeys simpler.
+	; Assign a hotkey to a library function with optional arguments. This is a wrapper around the
+	; Hotkey command intended to make assignment of hotkeys simpler.
 	;
 	; Parameters:
 	; Key
 	;     Key to bind
-	; Function
-	;     Function name to assign to hotkey
+	; Binding
+	;     This can be one of two things:
+	;     - A function name to assign to hotkey (no arguments passed)
+	;     - An object with Function and Args key-value pairs. Function is a string representing the
+	;       name of the function to assign, and Args is an array of arguments.
 	; GameOnly
 	;     Whether the hotkey should be activated only in-game
-	Assign(Key, Function, GameOnly := true) {
+	;
+	; Examples:
+	;
+	; ; Assign Ctrl-Alt-x to Diablo2.Exit()
+	; Diablo2.Assign("^!x", "Exit")
+	;
+	; ; Assign F8 to a one-off town portal
+	; Key := "F8"
+	; Diablo2.Assign(Key, {Function: "Skills.OneOff", Args: [Key]})
+	;
+	Assign(Key, Binding, GameOnly := true) {
+		if (IsObject(Binding)) {
+			if (!(Binding.HasKey("Function") and Binding.HasKey("Args"))) {
+				Diablo2.Fatal("Incorrect object passed to Diablo2.Assign(...)")
+			}
+			Function := Binding.Function
+			Args := Binding.Args
+		}
+		else {
+			Function := Binding
+			Args := []
+		}
 		if (Key == "") {
 			Diablo2.Fatal("Empty key for function " . Function)
 		}
@@ -111,7 +135,7 @@ class Diablo2 {
 				}
 				Obj := Obj[Component]
 			}
-			Function := ObjBindMethod(Obj, MethodName)
+			Function := ObjBindMethod(Obj, MethodName, Args)
 		}
 		Hotkey, %Key%, %Function%
 		if (GameOnly) {
@@ -125,12 +149,14 @@ class Diablo2 {
 	;
 	; Parameters:
 	; Bindings
-	;     Mapping of hotkey to library function
+	;     Mapping of hotkey to library function. Keys of Bindings are strings representing the hotkey
+	;     to bind. Values can be any valid Bind argument to Diablo2.Assign() [a function name string
+	;     or an object with Function and Args keys].
 	; GameOnly
 	;     Whether the hotkey should be activated only in-game
 	AssignMultiple(Bindings, GameOnly := true) {
-		for Key, Function in Bindings {
-			this.Assign(Key, Function, GameOnly)
+		for Key, Binding in Bindings {
+			this.Assign(Key, Binding, GameOnly)
 		}
 	}
 

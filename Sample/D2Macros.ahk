@@ -41,20 +41,12 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 	; Means activate in the game only.
 	, true)
 
-; Activate any new hotkeys created with the Hotkey command only in the Diablo II game itself.
-Hotkey, IfWinActive, % Diablo2.HotkeyCondition
-
 ; Assign Town Portal to F8 in the game. Now F8 will activate Town Portal, use it, and switch back to
 ; the last skill.
 Key := "F8"
-Function := ObjBindMethod(Diablo2.Skills, "OneOff", Key)
-Hotkey, %Key%, %Function%
+Diablo2.Assign(Key, {Function: "Skills.OneOff", Args: [Key]})
 
-; Activate any new hotkeys created with the Hotkey command in any application.
-Hotkey, IfWinActive
-
-; These hotkeys are assigned through a Diablo2 wrapper because they should be activated even under
-; suspension.
+; These hotkeys should be activated in any application.
 ;
 ; Don't use a key used for Diablo II, as the hotkey for suspend itself won't be suspended. Ideally,
 ; use a hotkey that won't be used in any applications globally.
@@ -63,10 +55,3 @@ Diablo2.AssignMultiple({"^!s": "Suspend"
 		, "^!x": "Exit"}
 	; Means activate in any application.
 	, false)
-
-; An alternate way to assign custom hotkeys. Unlike Hotkey, this has to be at the end of the file.
-;#IfWinActive ahk_class Diablo II
-
-;F8::Diablo2.Skills.OneOff("F8")
-
-;#IfWinActive
