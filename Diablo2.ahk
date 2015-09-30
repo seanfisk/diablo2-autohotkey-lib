@@ -750,10 +750,20 @@ class Diablo2 {
 		;
 		OneOff(Key) {
 			LButtonIsDown := GetKeyState("LButton")
-			CurrentSkill := this.Get()
+			OldSkill := this.Get()
+			OldWeaponSet := this._WeaponSet
 			this.Activate(Key)
+			; If we had to swap weapons to use the one-off skill, we need to wait a bit. These sleeps the
+			; only way it works reliably.
+			HadToSwap := this._WeaponSet != OldWeaponSet
+			if (HadToSwap) {
+				Sleep, 600
+			}
 			Click, Right
-			this.Activate(CurrentSkill)
+			if (HadToSwap) {
+				Sleep, 500
+			}
+			this.Activate(OldSkill)
 			; There are probably times when this isn't necessary, but it's
 			; really useful, for example, to keep moving after performing a
 			; Teleport. It's useful enough that it's included as the default
