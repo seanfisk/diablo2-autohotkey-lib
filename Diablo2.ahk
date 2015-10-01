@@ -769,15 +769,15 @@ class Diablo2 {
 			OldSkill := this.Get()
 			OldWeaponSet := this._WeaponSet
 			this.Activate(Key)
-			; If we had to swap weapons to use the one-off skill, we need to wait a bit. These sleeps the
-			; only way it works reliably.
+			; If we had to swap weapons to use the one-off skill, we need to wait a bit. These sleeps are
+			; the only way it works reliably.
 			HadToSwap := this._WeaponSet != OldWeaponSet
 			if (HadToSwap) {
 				Sleep, 600
 			}
 			Click, Right
 			if (HadToSwap) {
-				Sleep, 500
+				Sleep, 600
 			}
 			this.Activate(OldSkill)
 		}
