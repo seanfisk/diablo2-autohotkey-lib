@@ -239,13 +239,10 @@ class Diablo2 {
 	;     RButton::Diablo2_RightClick()
 	;
 	RightClick() {
-		LButtonIsDown := GetKeyState("LButton")
+		LBRestore := new Diablo2._LButtonRestore()
 		this.Send("{RButton down}")
 		KeyWait, RButton
 		this.Send("{RButton up}")
-		if (LButtonIsDown) {
-			this.Send("{LButton down}")
-		}
 	}
 
 	; Convert a key in Hotkey syntax to Send syntax. Currently, if the string is more than one
@@ -392,6 +389,22 @@ class Diablo2 {
 	}
 
 	; Private classes
+	class _LButtonRestore {
+		_IsDown := false
+		; Use RAII to save and restore the state of LButton.
+		__New() {
+			this._IsDown := GetKeyState("LButton")
+		}
+
+		__Delete() {
+			if (this._IsDown) {
+				; When using SendInput, it is so fast that the game needs time to react.
+				Sleep, 50
+				Diablo2.Send("{LButton down}")
+			}
+		}
+	}
+
 	class _Feature {
 		; Log a message on behalf of this feature.
 		_Log(Message, Level := "DEBUG") {
@@ -749,7 +762,10 @@ class Diablo2 {
 		;     The skill hotkey
 		;
 		OneOff(Key) {
-			LButtonIsDown := GetKeyState("LButton")
+			; There are times when it isn't necessary to save the state of LButton, but it's really
+			; useful, for example, to keep moving after performing a Teleport. It's useful enough that
+			; it's included as the default behavior.
+			LBRestore := new LButtonRestore()
 			OldSkill := this.Get()
 			OldWeaponSet := this._WeaponSet
 			this.Activate(Key)
@@ -764,15 +780,6 @@ class Diablo2 {
 				Sleep, 500
 			}
 			this.Activate(OldSkill)
-			; There are probably times when this isn't necessary, but it's
-			; really useful, for example, to keep moving after performing a
-			; Teleport. It's useful enough that it's included as the default
-			; behavior.
-			if (LButtonIsDown) {
-				; SendInput is so fast that the game needs time to react.
-				Sleep, 50
-				Diablo2.Send("{LButton down}")
-			}
 		}
 	}
 
