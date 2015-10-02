@@ -16,7 +16,7 @@ These macros solve this problem by allowing you to specify the preferred weapon 
 
 There is also a function available for use of one-off skills, such as Town Portal. This function allows you to assign a hotkey which switches to a skill, uses it, and then switches back to the last skill.
 
-**Automatic filling of potion belt.** The potion belt is a great way to heal yourself quickly! However, once your potion belt is empty, you have to remove yourself from the fray to refill it. This macro automatically fills your belt with potions from your inventory *and allows you to continue moving while it is executing*. This is a massive advantage as you can get back to the action much more quickly.
+**Automatic fill your belt with potions.** Using potions from the belt is a great way to heal yourself quickly! However, once your belt is empty, you have to remove yourself from the fray to refill it. This macro automatically fills your belt with potions from your inventory *and allows you to continue moving while it is executing*. This is a massive advantage as you can get back to the action much more quickly.
 
 **Mass inventory macros.** Select a block of multiple items anywhere and easily move or drop all of them at once. Move supports only single-cell items and can be used, for example, to move items within or between the stash, inventory, and Horadric Cube. Drop supports items of any size and can be used, for example, to drop multiple items on the ground, into a shop for selling, or into the Horadric Cube.
 
@@ -91,7 +91,7 @@ Start the macros then start your game. If you are already running the game, make
 
 See the sample file for an example on how to assign a hotkey to a one-off skill, like Town Portal.
 
-### Fill Potion Belt
+### Fill Potion
 
 The setup for this macro is a little bit more elaborate because it relies on image recognition to find potions in your inventory. Before recognizing images, however, we need to generate bitmaps of each potion. The bitmap generation script is written using [PowerShell][ps], so we need to allow the system to run PowerShell scripts. Do this by opening a PowerShell prompt as an Administrator and running:
 

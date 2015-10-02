@@ -284,7 +284,7 @@ class Diablo2 {
 		this.Send(this.HotkeySyntaxToSendSyntax(this.Controls["Inventory Screen"]))
 	}
 
-	; Show the potion belt.
+	; Show the belt.
 	ShowBelt() {
 		this.Send(this.HotkeySyntaxToSendSyntax(this.Controls["Show Belt"]))
 	}
@@ -1023,7 +1023,7 @@ class Diablo2 {
 			}
 		}
 
-		; Fill the potion belt.
+		; Fill the belt with potions.
 		Activate() {
 			this._Function.Call()
 		}
@@ -1215,7 +1215,7 @@ class Diablo2 {
 			Diablo2.Send("{Shift down}")
 		}
 
-		; End potion belt insertion and clear the screen.
+		; End insertion of potions to the belt and clear the screen.
 		_End() {
 			this._Log("Finishing run")
 			Diablo2.Send("{Shift up}")
@@ -1230,7 +1230,7 @@ class Diablo2 {
 			this._LogWithType(Type_, Format("{1:-7}|{2}", Size, Message))
 		}
 
-		; Fill the potion belt in windowed mode.
+		; Fill the belt with potions in windowed mode.
 		_Windowed() {
 			this._Begin()
 			for Type_, Sizes in this._Potions {
@@ -1267,7 +1267,7 @@ WindowedSizeLoop:
 			this._End()
 		}
 
-		; Begin filling the potion belt in fullscreen mode.
+		; Begin filling belt with potions in fullscreen mode.
 		_FullscreenBegin() {
 			this._Begin()
 			; Initialize structures
@@ -1278,7 +1278,7 @@ WindowedSizeLoop:
 			this._TakeScreenshot("_FullscreenProcess")
 		}
 
-		; Process screenshot to fill the potion belt in fullscreen mode.
+		; Process screenshot to fill the belt with potions in fullscreen mode.
 		_FullscreenProcess(_1, _2, HaystackPath) {
 			; In both master (which has incorrect docs) and v2-alpha (which has correct docs), the callback
 			; function takes three arguments:
@@ -1331,8 +1331,8 @@ PotionSizeLoop:
 						Coords := StrSplit(CoordsString, "`,")
 						PotionFound := {X: Coords[1], Y: Coords[2]}
 						this._LogWithSize(Type_, Size, Format("Found at {1},{2}", PotionFound.X, PotionFound.Y))
-						; If any of the potions found were clicked before, the potion belt is already full
-						; of this type and we are finished with it.
+						; If any of the potions found were clicked before, the belt is already full of this type
+						; and we are finished with it.
 						for _4, PotionClicked in this._FullscreenState[Type_].PotionsClicked {
 							if (PotionFound.X == PotionClicked.X and PotionFound.Y == PotionClicked.Y) {
 								this._FullscreenState[Type_].Finished := true
