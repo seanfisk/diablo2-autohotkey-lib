@@ -1184,6 +1184,7 @@ class Diablo2 {
 			}
 			return Bitmap
 		}
+
 		; Perform a click to insert a potion into the belt.
 		;
 		; Parameters:
