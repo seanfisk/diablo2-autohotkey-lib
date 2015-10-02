@@ -405,6 +405,35 @@ class Diablo2 {
 		}
 	}
 
+	class _MousePosRestore {
+		_Pos := {X: -1, Y: -1}
+		; Use RAII to save and restore the mouse position.
+		__New() {
+			MouseGetPos, MouseX, MouseY
+			this._Pos := {X: MouseX, Y: MouseY}
+		}
+
+		__Delete() {
+			MouseMove, this._Pos.X, this._Pos.Y
+		}
+	}
+
+	class _MouseRestore {
+		; Use RAII to save and restore the mouse position and LButton state.
+		__New() {
+			this._PosRestore := new Diablo2._MousePosRestore()
+			this._LBRestore := new Diablo2._LButtonRestore()
+		}
+
+		__Delete() {
+			; Restore the position first.
+			this._PosRestore := ""
+			; Sleep slightly so that LButton doesn't accidentally take effect in the old position.
+			Sleep, 100
+			this._LBRestore := ""
+		}
+	}
+
 	class _Feature {
 		; Log a message on behalf of this feature.
 		_Log(Message, Level := "DEBUG") {
