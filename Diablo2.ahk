@@ -53,7 +53,6 @@ class Diablo2 {
 		, Skills: "ExitThread"
 		, MassItem: "ExitThread"
 		, FillPotion: "ExitThread"
-		, Hireling: "ExitThread"
 		, Steam: "ExitThread"}
 	; Use an object for HasKey because arrays don't have a Contains-type method presumably, HasKey
 	; operates in O(1) and would be faster than writing our own Contains.
@@ -403,35 +402,6 @@ class Diablo2 {
 				Sleep, 50
 				Diablo2.Send("{LButton down}")
 			}
-		}
-	}
-
-	class _MousePosRestore {
-		_Pos := {X: -1, Y: -1}
-		; Use RAII to save and restore the mouse position.
-		__New() {
-			MouseGetPos, MouseX, MouseY
-			this._Pos := {X: MouseX, Y: MouseY}
-		}
-
-		__Delete() {
-			MouseMove, this._Pos.X, this._Pos.Y
-		}
-	}
-
-	class _MouseRestore {
-		; Use RAII to save and restore the mouse position and LButton state.
-		__New() {
-			this._PosRestore := new Diablo2._MousePosRestore()
-			this._LBRestore := new Diablo2._LButtonRestore()
-		}
-
-		__Delete() {
-			; Restore the position first.
-			this._PosRestore := ""
-			; Sleep slightly so that LButton doesn't accidentally take effect in the old position.
-			Sleep, 100
-			this._LBRestore := ""
 		}
 	}
 
@@ -1185,7 +1155,6 @@ class Diablo2 {
 			}
 			return Bitmap
 		}
-
 		; Perform a click to insert a potion into the belt.
 		;
 		; Parameters:
@@ -1405,88 +1374,6 @@ PotionSizeLoop:
 				; Get the next screenshot
 				Diablo2.Send(this._ScreenShotKey)
 			}
-		}
-	}
-
-	class _HirelingFeature extends Diablo2._EnabledFeature {
-		static _BeltSlotWidth := 31
-		static _BeltLeft := {X: 437, Y: 577}
-		static _PartyLeftIcon := {X: 39, Y: 39}
-		static _PartyIconSeparation := 56
-
-		_PartyPosition := 1
-
-		PartyPosition[] {
-			get {
-				return this._PartyPosition
-			}
-			set {
-				; Limit to positive integers.
-				this._PartyPosition := Diablo2._Max(1, value)
-				this._Log("Party position is " . this._PartyPosition)
-				Diablo2.Voice.Speak("Hireling at " . this._PartyPosition)
-				return this._PartyPosition
-			}
-		}
-
-		; Setup hotkeys for GivePotion, adding a modifier to each belt hotkey.
-		;
-		; Parameters:
-		; Modifier
-		;     The modifier to add to each belt hotkey (default is Shift)
-		SetupBeltWithModifier(Modifier := "+") {
-			for Index, Key in Diablo2.Controls.Belt {
-				Diablo2.Assign(Modifier . Key, {Function: "Hireling.GivePotion", Args: [Index]})
-			}
-		}
-
-		; Increment hireling party position.
-		PartyPositionUp() {
-			this.PartyPosition += 1
-		}
-
-		; Decrement hireling party position.
-		PartyPositionDown() {
-			this.PartyPosition -= 1
-		}
-
-		; Give a potion to your hireling with a potion from your potion belt.
-		;
-		; Parameters:
-		; PotionBeltSlot
-		;     Position in the potion belt from which to take the potion (1-4)
-		GivePotion(PotionBeltSlot) {
-			if (PotionBeltSlot < 1 or PotionBeltSlot > 4) {
-				Diablo2.Fatal("Invalid potion belt position: " . PotionBeltSlot)
-			}
-			Potion := {X: this._BeltLeft.X + this._BeltSlotWidth * (PotionBeltSlot - 1)
-				, Y: this._BeltLeft.Y}
-			Hireling := {X: this._PartyLeftIcon.X + this._PartyIconSeparation * (this.PartyPosition - 1)
-				, Y: this._PartyLeftIcon.Y}
-			this._Log(Format("Giving potion in slot {} ({},{}) to hireling in position {} ({},{})"
-				, PotionBeltSlot, Potion.X, Potion.Y, this.PartyPosition, Hireling.X, Hireling.Y))
-			; If the LButton is down, the character might walk the wrong way. But forcefully raising the
-			; LButton here often causes the potion to be held in hand instead of being dropped on the
-			; hireling.
-
-			; Restoring at the end of this function (with a Sleep, 100 at the end) was quite promising,
-			; but about 1/10 of the time it would cause the potion to be dropped on the ground. That is a
-			; little too unreliable to be acceptable.
-			;MouseRestore := new Diablo2._MouseRestore()
-
-			this._Click(Potion)
-			Sleep, 150
-			this._Click(Hireling)
-		}
-
-		; Perform a click which restores the mouse position afterwards.
-		_Click(Coords) {
-			; Unfortunately, we can't restore LButton state here as this sporadically causes the potion to
-			; be dropped on the ground instead of given to the hireling. Just killing the LButton state is
-			; unfortunate, but it's been the most reliable solution.
-			MousePosRestore := new Diablo2._MousePosRestore()
-			X := Coords.X, Y:= Coords.Y
-			Click, %X%, %Y%
 		}
 	}
 

@@ -31,7 +31,6 @@ Diablo2.Init("Controls.json"
 		, Skills: "Skills.json"
 		, MassItem: {}
 		, FillPotion: {Fullscreen: true}
-		, Hireling: {}
 		; Enable Steam feature; Ctrl-Tab for the overlay is the default for Steam and for these macros.
 		, Steam: {OverlayKey: "^Tab", BrowserTabUrls: GetTabUrls()}})
 
@@ -56,10 +55,6 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 		, "^!w": "Steam.BrowserOpenTabs"}
 	; Means activate in the game only.
 	, true)
-
-; Setup defaults for Hireling macros: Press Shift+BeltKey ("+" is Shift) to give the potion in that
-; belt slot to your hireling.
-Diablo2.Hireling.SetupBeltWithModifier("+")
 
 ; Assign Town Portal to F8 in the game. Now F8 will activate Town Portal, use it, and switch back to
 ; the last skill.
