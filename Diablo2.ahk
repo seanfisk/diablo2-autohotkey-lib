@@ -1425,15 +1425,7 @@ PotionSizeLoop:
 			}
 		}
 
-		; Launch the game through Steam. You can set up this feature by following these steps:
-		;
-		; 1. Open the Steam Library.
-		; 2. Click ADD A GAME... -> Add a Non-Steam Game...
-		; 3. Click BROWSE... and navigate to Documents\AutoHotkey\Lib within your home directory.
-		; 4. Select Diablo II.exe. This is an AHK wrapper around running the actual game.
-		; 5. Back in the Library, right-click Diablo II -> Create Desktop Shortcut.
-		; 6. On the desktop, right-click the shortcut and choose Properties. Copy the URL into your
-		;    macros.
+		; Launch the game through Steam. See the README for instructions on setting this up.
 		;
 		; Parameters:
 		; GameUrl
