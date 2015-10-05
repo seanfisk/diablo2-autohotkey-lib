@@ -590,7 +590,7 @@ class Diablo2 {
 					DuplicateKeyFunction := KeyFunctions[Key]
 					if (DuplicateKeyFunction != "") {
 						Diablo2.Voice.Speak(Format("Duplicate key {} for {} and {}"
-							, Key, DuplicateKeyFunction, Function), false)
+							, Key, DuplicateKeyFunction, Function), true)
 							Diablo2.Fatal(Format("Duplicate key binding '{}' for '{}' and '{}'"
 								, Key, DuplicateKeyFunction, Function))
 					}
@@ -620,7 +620,7 @@ class Diablo2 {
 		Require(Function, Feature) {
 			Key := this[Function]
 			if (Key == "") {
-				Diablo2.Voice.Speak(Format("Control {} required for {}", Function, Feature), false)
+				Diablo2.Voice.Speak(Format("Control {} required for {}", Function, Feature), true)
 				Diablo2.Fatal(Format("Control assignment for {} is required for {}", Function, Feature))
 			}
 			return Diablo2.HotkeySyntaxToSendSyntax(Key)
@@ -1005,7 +1005,7 @@ class Diablo2 {
 				; Start GDI+ for full screen
 				this._GdipToken := Gdip_Startup()
 				if (!this._GdipToken) {
-					Diablo2.Voice.Speak("GDI+ failed", false)
+					Diablo2.Voice.Speak("GDI+ failed", true)
 					Diablo2.Fatal("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AutoHotkey")
 				}
 			}
@@ -1179,7 +1179,7 @@ class Diablo2 {
 		_CreateBitmapFromFile(FilePath) {
 			Bitmap := Gdip_CreateBitmapFromFile(FilePath)
 			if (Bitmap <= 0) {
-				Diablo2.Voice.Speak("Bitmap creation failed", false)
+				Diablo2.Voice.Speak("Bitmap creation failed", true)
 				Diablo2.Fatal("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
 			}
 			return Bitmap
@@ -1244,7 +1244,7 @@ WindowedSizeLoop:
 							, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y
 							, % Format("*{} {}", this._Variation, NeedlePath)
 						if (ErrorLevel == 2) {
-							Diablo2.Voice.Speak("Fill potion error", false)
+							Diablo2.Voice.Speak("Fill potion error", true)
 							Diablo2.Fatal("Needle image file not found: " . NeedlePath)
 						}
 						if (ErrorLevel == 1) {
@@ -1321,7 +1321,7 @@ PotionSizeLoop:
 
 					; Anything less than 0 indicates an error.
 					if (NumPotionsFound < 0) {
-						Diablo2.Voice.Speak("Fill potion error", false)
+						Diablo2.Voice.Speak("Fill potion error", true)
 						Diablo2.Fatal("Gdip_ImageSearch call failed with error code " . NumPotionsFound)
 					}
 
