@@ -294,6 +294,46 @@ class Diablo2 {
 		this.Send(this.HotkeySyntaxToSendSyntax(this.Controls["Clear Screen"]))
 	}
 
+	; Take a screenshot, watch the Diablo II installation directory for it, and call the callback when
+	; the screenshot is available.
+	;
+	; Parameters:
+	; CallbackFunc
+	;     Function to call when the screenshot is written to the directory. The function can be a
+	;     value of type Func or BoundFunc and is called with one argument, the path to the screenshot
+	;     image.
+	TakeScreenshot(CallbackFunc) {
+		; WatchDirectory doesn't support callbacks of type BoundFunc, only Func. Deploy workaround.
+		this._ScreenshotCallback := CallbackFunc
+		; Note: InstallPath has a trailing slash
+		; Triple question marks ("???") don't seem to work, but "*" should be fine.
+		Code := WatchDirectory(this._InstallPath . "|Screenshot*.jpg"
+			, Func("_Diablo2_ScreenshotCallback")
+			; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a
+			; screenshot.
+			, 0x10)
+		if (Code < 0) {
+			Diablo2.Fatal("WatchDirectory exited with " . Code)
+		}
+		Diablo2.Send(this._ScreenShotKey)
+	}
+
+	; Safely create a bitmap from a file.
+	;
+	; Parameters:
+	; FilePath
+	;     Path to image file.
+	;
+	; Returns: The created bitmap
+	SafeCreateBitmapFromFile(FilePath) {
+		Bitmap := Gdip_CreateBitmapFromFile(FilePath)
+		if (Bitmap <= 0) {
+			Diablo2.Voice.Speak("Bitmap creation failed", true)
+			Diablo2.Fatal("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
+		}
+		return Bitmap
+	}
+
 	; Private methods
 
 	; Perform initialization of the macros.
@@ -322,6 +362,15 @@ class Diablo2 {
 		for Name, Feature in this._Features {
 			this.Log.Message(Name, Feature.Enabled ? "Enabled" : "Disabled")
 		}
+
+		; Get the Screen Shot key and installation path for TakeScreenshot.
+		;
+		; XXX: Screen Shot was previously only required for Fill Potion. Exposing TakeScreenshot as a
+		; public API means that it will be required for everyone, even users not using FillPotion.
+		this._ScreenShotKey := this.Controls.Require("Screen Shot", "TakeScreenshot")
+		; Find installation directory
+		RegRead, InstallPath, % this.RegistryKey, InstallPath
+		this._InstallPath := InstallPath
 	}
 
 	; Load or return a feature configuration.
@@ -967,17 +1016,11 @@ class Diablo2 {
 			for _, Function in ["Inventory Screen", "Show Belt", "Clear Screen"] {
 				Diablo2.Controls.Require(Function, this.Name)
 			}
-			; We use screen shots in both windowed and fullscreen to generate
-			; bitmaps, so we need the key and installation path for both.
-			this._ScreenShotKey := Diablo2.Controls.Require("Screen Shot", this.Name)
 			for _, Key in ["Fullscreen", "LesserFirst", "FullscreenPotionsPerScreenshot"] {
 				if Config.HasKey(Key) {
 					this["_" . Key] := Config[Key]
 				}
 			}
-			; Find installation directory
-			RegRead, InstallPath, % Diablo2.RegistryKey, InstallPath
-			this._InstallPath := InstallPath
 			; Set variation if it wasn't provided
 			; Variation defaults are recommend; they were determined emperically
 			this._Variation := Config.HasKey("Variation")
@@ -1034,11 +1077,11 @@ class Diablo2 {
 			Diablo2.ClearScreen()
 			Diablo2.OpenInventory()
 			Sleep, 100 ; Wait for the inventory to appear
-			this._TakeScreenshot("_GenerateBitmapsFromScreenshot")
+			Diablo2.TakeScreenshot(ObjBindMethod(this, "_GenerateBitmapsFromScreenshot"))
 		}
 
 		; Generate and write needle bitmaps from a taken screenshot.
-		_GenerateBitmapsFromScreenshot(_1, _2, ScreenshotPath) {
+		_GenerateBitmapsFromScreenshot(ScreenshotPath) {
 			this._StopWatchDirectory()
 			; If we are in fullscreen, dispose the bitmaps so that our PowerShell script can access those
 			; paths. The bitmaps will be re-created when resetting. If we are in windowed mode, this is a
@@ -1106,27 +1149,6 @@ class Diablo2 {
 			}
 		}
 
-		; Take a screenshot and watch the Diablo II installation directory for it.
-		;
-		; Parameters:
-		; CallbackMethodName
-		;     Name of method on this object to use as the callback
-		_TakeScreenshot(CallbackMethodName) {
-			; WatchDirectory doesn't support the return value of ObjBindMethod...
-			this._WatchDirectoryCallback := ObjBindMethod(this, CallbackMethodName)
-			; Note: InstallPath has a trailing slash
-			; Triple question marks ("???") don't seem to work, but "*" should be fine.
-			Code := WatchDirectory(this._InstallPath . "|Screenshot*.jpg"
-				, Func("_Diablo2_WatchDirectoryCallback")
-				; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a
-				; screenshot.
-				, 0x10)
-			if (Code < 0) {
-				Diablo2.Fatal("WatchDirectory exited with " . Code)
-			}
-			Diablo2.Send(this._ScreenShotKey)
-		}
-
 		; Check for and initialize bitmaps.
 		_InitBitmaps() {
 			BitmapPaths := {}
@@ -1145,7 +1167,7 @@ class Diablo2 {
 			if (this._Fullscreen) {
 				for Type_, Sizes in BitmapPaths {
 					for Size, Path in Sizes {
-						this._NeedleBitmaps[Type_, Size] := this._CreateBitmapFromFile(Path)
+						this._NeedleBitmaps[Type_, Size] := Diablo2.SafeCreateBitmapFromFile(Path)
 					}
 				}
 			}
@@ -1167,22 +1189,6 @@ class Diablo2 {
 				, A_WorkingDir
 				, this._Fullscreen ? "Fullscreen" : "Windowed"
 				, Type_, Size)
-		}
-
-		; Safely create a bitmap from a file.
-		;
-		; Parameters:
-		; FilePath
-		;     Path to image file.
-		;
-		; Returns: The created bitmap
-		_CreateBitmapFromFile(FilePath) {
-			Bitmap := Gdip_CreateBitmapFromFile(FilePath)
-			if (Bitmap <= 0) {
-				Diablo2.Voice.Speak("Bitmap creation failed", true)
-				Diablo2.Fatal("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
-			}
-			return Bitmap
 		}
 
 		; Perform a click to insert a potion into the belt.
@@ -1275,25 +1281,16 @@ WindowedSizeLoop:
 				this["_FullscreenState", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
 			}
 			Sleep, 100 ; Wait for the inventory to appear
-			this._TakeScreenshot("_FullscreenProcess")
+			Diablo2.TakeScreenshot(ObjBindMethod(this, "_FullscreenProcess"))
 		}
 
 		; Process screenshot to fill the belt with potions in fullscreen mode.
-		_FullscreenProcess(_1, _2, HaystackPath) {
-			; In both master (which has incorrect docs) and v2-alpha (which has correct docs), the callback
-			; function takes three arguments:
-			;
-			; - WatchDirectory "this" object (not quite sure what this is)
-			; - "from path"
-			; - "to path"
-			;
-			; Both the "from" and "to" paths will be populated for FILE_NOTIFY_CHANGE_LAST_WRITE, but
-			; we'll just use the latter.
+		_FullscreenProcess(HaystackPath) {
 			this._Log("Processing " . HaystackPath)
 
 			; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the bugs. w and h are supposed (?) to represent width and height; they are used as such in the AHK code but not the C code. This causes problems and an inability to find the needle. We are now using MasterFocus' Gdip_ImageSearch, which works well.
 			; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
-			HaystackBitmap := this._CreateBitmapFromFile(HaystackPath)
+			HaystackBitmap := Diablo2.SafeCreateBitmapFromFile(HaystackPath)
 			; Assume we are finished for now; invalidate later if we are not.
 			Finished := true
 
@@ -1402,7 +1399,7 @@ PotionSizeLoop:
 				; Sleep, 100
 
 				; Get the next screenshot
-				Diablo2.Send(this._ScreenShotKey)
+				Diablo2.Send(Diablo2._ScreenShotKey)
 			}
 		}
 	}
@@ -1511,7 +1508,19 @@ _Diablo2_Steam_BrowserOpenTabs() {
 	; them suspended.
 }
 
-; Wrapper for WatchDirectory callback.
-_Diablo2_WatchDirectoryCallback(_1, _2, _3) {
-	Diablo2.FillPotion._WatchDirectoryCallback.Call(_1, _2, _3)
+; Wrapper for the screenshot WatchDirectory callback.
+_Diablo2_ScreenshotCallback(WDThis, FromPath, ToPath) {
+	; In both WatchDirectory's master branch (which has incorrect docs) and v2-alpha (which has
+	; correct docs), the callback function takes three arguments:
+	;
+	; - WatchDirectory "this" object (not quite sure what this is)
+	; - "from path"
+	; - "to path"
+	;
+	; Both the "from" and "to" paths will be populated for FILE_NOTIFY_CHANGE_LAST_WRITE, but
+	; we'll just use the latter.
+	;
+	; XXX: Calling a function object in an essentially global variable is certainly a race condition
+	; if more than one thread calls TakeScreenshot().
+	Diablo2._ScreenshotCallback.Call(ToPath)
 }
