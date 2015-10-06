@@ -32,7 +32,7 @@ Diablo2.Init("Controls.json"
 		, MassItem: {}
 		, FillPotion: {Fullscreen: true}
 		; Enable Steam feature; Ctrl-Tab for the overlay is the default for Steam and for these macros.
-		, Steam: {OverlayKey: "^Tab", BrowserTabUrls: GetTabUrls()}})
+		, Steam: {OverlayKey: "^{Tab}", BrowserTabUrls: GetTabUrls()}})
 
 ; Ctrl+Alt+a to auto-configure controls.
 ; '^' is Control, '!' is Alt, and 'a' is the a key.
