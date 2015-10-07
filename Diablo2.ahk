@@ -109,7 +109,7 @@ class Diablo2 {
 	Assign(Key, Binding, GameOnly := true) {
 		if (IsObject(Binding)) {
 			if (!(Binding.HasKey("Function") and Binding.HasKey("Args"))) {
-				Diablo2.Fatal("Invalid object passed to Diablo2.Assign(...)")
+				throw Exception("Invalid object giving for Binding; must have ""Function"" and ""Args"" keys")
 			}
 			Function := Binding.Function
 			Args := Binding.Args
@@ -119,7 +119,7 @@ class Diablo2 {
 			Args := []
 		}
 		if (Key == "") {
-			Diablo2.Fatal("Empty key for function " . Function)
+			throw Exception("Empty key for function: " . Function)
 		}
 		if (GameOnly) {
 			; Turn on context-sensitive hotkey creation
@@ -129,7 +129,7 @@ class Diablo2 {
 			; Due to AHK limitations, "Suspend, *" doesn't work in a function reference. A suspension
 			; exempt function therefore cannot support arguments.
 			if (Args.Length() > 0) {
-				Diablo2.Fatal("Arguments not supported for suspend permit function " . Function)
+				throw Exception("Arguments not supported for suspend permit function: " . Function)
 			}
 			Function := "_Diablo2_" . StrReplace(Function, ".", "_")
 		}
@@ -139,7 +139,7 @@ class Diablo2 {
 			Obj := this
 			for _, Component in Components {
 				if (!Obj.HasKey(Component)) {
-					Diablo2.Fatal(Format("Invalid component ""{}""", Component))
+					throw Exception("Invalid component: " . Component)
 				}
 				Obj := Obj[Component]
 			}
@@ -202,14 +202,24 @@ class Diablo2 {
 		this._Init()
 	}
 
-	; Exit the program with a fatal error, logging the message to the log file.
+	; Return the keybinding for a certain control, throwing if it is not assigned.
 	;
 	; Parameters:
-	; Message
-	;     Explanation of the error
-	Fatal(Message) {
-		this.Log.Message("Global", Message, "FATAL")
-		ExitApp 1
+	; Function
+	;     Action the control performs
+	; SendSyntax
+	;     Pass true to return in Send syntax. The default is to return in Hotkey syntax.
+	;
+	; Return value: the key binding
+	GetControl(Function, SendSyntax := false) {
+		Key := Diablo2.Controls[Function]
+		if (Key == "") {
+			throw Exception("Control assignment required: " . Function, , Function . " key required")
+		}
+		if (SendSyntax) {
+			return Diablo2.HotkeySyntaxToSendSyntax(Key)
+		}
+		return Key
 	}
 
 	; Send keys in our specific format.
@@ -280,18 +290,17 @@ class Diablo2 {
 
 	; Open the inventory.
 	OpenInventory() {
-		; XXX Check for these keys
-		this.Send(this.HotkeySyntaxToSendSyntax(this.Controls["Inventory Screen"]))
+		this.Send(this.GetControl("Inventory Screen", true))
 	}
 
 	; Show the belt.
 	ShowBelt() {
-		this.Send(this.HotkeySyntaxToSendSyntax(this.Controls["Show Belt"]))
+		this.Send(this.GetControl("Show Belt", true))
 	}
 
 	; Clear the screen.
 	ClearScreen() {
-		this.Send(this.HotkeySyntaxToSendSyntax(this.Controls["Clear Screen"]))
+		this.Send(this.GetControl("Clear Screen", true))
 	}
 
 	; Take a screenshot, watch the Diablo II installation directory for it, and call the callback when
@@ -303,19 +312,20 @@ class Diablo2 {
 	;     value of type Func or BoundFunc and is called with one argument, the path to the screenshot
 	;     image.
 	TakeScreenshot(CallbackFunc) {
+		ScreenShotKey := this.GetControl("Screen Shot", true)
 		; WatchDirectory doesn't support callbacks of type BoundFunc, only Func. Deploy workaround.
 		this._ScreenshotCallback := CallbackFunc
 		; Note: InstallPath has a trailing slash
 		; Triple question marks ("???") don't seem to work, but "*" should be fine.
-		Code := WatchDirectory(this._InstallPath . "|Screenshot*.jpg"
+		RetCode := WatchDirectory(this._InstallPath . "|Screenshot*.jpg"
 			, Func("_Diablo2_ScreenshotCallback")
 			; 0x10 is FILE_NOTIFY_CHANGE_LAST_WRITE, which gets called when Diablo II creates a
 			; screenshot.
 			, 0x10)
-		if (Code < 0) {
-			Diablo2.Fatal("WatchDirectory exited with " . Code)
+		if (RetCode < 0) {
+			throw Exception("WatchDirectory exited with " . RetCode)
 		}
-		Diablo2.Send(this._ScreenShotKey)
+		Diablo2.Send(ScreenShotKey)
 	}
 
 	; Safely create a bitmap from a file.
@@ -328,8 +338,7 @@ class Diablo2 {
 	SafeCreateBitmapFromFile(FilePath) {
 		Bitmap := Gdip_CreateBitmapFromFile(FilePath)
 		if (Bitmap <= 0) {
-			Diablo2.Voice.Speak("Bitmap creation failed", true)
-			Diablo2.Fatal("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
+			throw Exception("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
 		}
 		return Bitmap
 	}
@@ -340,10 +349,9 @@ class Diablo2 {
 	_Init() {
 		; Do not omit 'this' in the 'new' expression! Bad things happen.
 		this.Controls := new this._ControlsFeature(this._LoadConfig(this.Config.Controls))
-		this.Controls.Name := "Controls"
 		this._Features.Controls := this.Controls
 		for Name, DisabledClassName in this._OptionalFeaturesDisabledClasses {
-			Feature := {Name: Name}
+			Feature := {}
 			if (this.Config.HasKey(Name)) {
 				; We must manually initialize instead of using the 'new' operator because we do not know the
 				; base class in advance.
@@ -363,12 +371,7 @@ class Diablo2 {
 			this.Log.Message(Name, Feature.Enabled ? "Enabled" : "Disabled")
 		}
 
-		; Get the Screen Shot key and installation path for TakeScreenshot.
-		;
-		; XXX: Screen Shot was previously only required for Fill Potion. Exposing TakeScreenshot as a
-		; public API means that it will be required for everyone, even users not using FillPotion.
-		this._ScreenShotKey := this.Controls.Require("Screen Shot", "TakeScreenshot")
-		; Find installation directory
+		; Find installation directory; this is used for TakeScreenshot()
 		RegRead, InstallPath, % this.RegistryKey, InstallPath
 		this._InstallPath := InstallPath
 	}
@@ -387,17 +390,15 @@ class Diablo2 {
 		try {
 			FileRead, FileContents, %PathOrObject%
 		}
-		catch, e {
-			; We can't log or speak yet because those features haven't been initialized.
-			MsgBox, % "Error reading file " . PathOrObject
-			ExitApp 1
+		catch {
+			throw Exception("Error reading file " . PathOrObject)
 		}
 		return JSON.Load(FileContents, true)
 	}
 
 	; Macro shutdown function
 	_Shutdown() {
-			this.Log.Message("Global", "Shutting down")
+		this.Log.Message("Global", "Shutting down")
 	}
 
 		; Return the minimum of two parameters.
@@ -486,16 +487,78 @@ class Diablo2 {
 	class _Feature {
 		; Log a message on behalf of this feature.
 		_Log(Message, Level := "DEBUG") {
-			Diablo2.Log.Message(this.Name, Message, Level)
+			Diablo2.Log.Message(this._Name, Message, Level)
+		}
+
+		_Name[] {
+			get {
+				; Extract the feature name from the class name, if possible.
+				; O tells RegExMatch to return a match object.
+				; S tells RegExMatch to study the expression and cache it.
+				ClassName := this.__Class
+				if (RegExMatch(ClassName, "OS)_([a-zA-Z0-9]+)Feature$", MatchObject)) {
+					return MatchObject.Value(1)
+				}
+				else {
+					return ClassName
+				}
+			}
+		}
+	}
+
+	class _EnabledFeature extends Diablo2._Feature {
+		static Enabled := true
+
+		; Intercept all calls and redirect to a function with "g" as a prefix. A "g" prefix means the
+		; function is intended to be assigned to an in-game hotkey. In this case, we'll catch all
+		; exceptions and log/announce them while exiting the current thread. This has several
+		; advantages:
+		;
+		; Over returning directly from the hotkey function:
+		;
+		; - Functions deeper in the stack can throw and it will be handled in the same way as if the
+		;		hotkey function had thrown. This means the hotkey function itself can safely ignore (not
+		;		catch) any of those errors; they will be logged without any additional work.
+		;
+		; Over a global exit function (previously Diablo2.Fatal()):
+		;
+		; - Throw utilizes an existing language feature; it is not specific to this library. Therefore,
+		;   any existing libraries using it will happily work without modification.
+		; - Functions used both inside and outside of the game will work the same: outside the game, a
+		;   dialog will result; inside the game, the error will be logged and announced.
+		;
+		; Disadvantages:
+		;
+		; - The call interception code is a bit more complex than either of the other solutions.
+		;
+		__Call(Name, Params*) {
+			RealName := "g" . Name
+			if (IsFunc(this[RealName])) {
+				try {
+					return this[RealName](Params*)
+				}
+				catch Exc {
+					; Feature are used in-game, so don't display a dialog. Instead, write to the log, announce
+					; via speech, and exit the current thread.
+					Message := Exc.Message
+					if (A_ThisHotkey != "") {
+						Message .= Format(" [Hotkey: {}]", A_ThisHotkey)
+					}
+					base._Log(Message, "FATAL")
+					; If the Exception has an Extra key, speak whatever that is.
+					;
+					; Speaking asynchronously when the current thread is exiting causes inconsistent results.
+					; Just speak synchronously to be sure.
+					Diablo2.Voice.Speak(Exc.HasKey("Extra") ? Exc.Extra : this._Name . " error", true)
+					; Exit the hotkey function. In most cases, this will exit the current thread.
+					return
+				}
+			}
 		}
 	}
 
 	; We make the Enabled variable static so that it does not have to be initialized by __Init, a call
 	; which gets intercepted by __Call.
-	class _EnabledFeature extends Diablo2._Feature {
-		static Enabled := true
-	}
-
 	class _DisabledFeature extends Diablo2._Feature {
 		static Enabled := false
 	}
@@ -507,9 +570,6 @@ class Diablo2 {
 	}
 
 	class _ExitThreadFeature extends Diablo2._DisabledFeature {
-		_Log(Message, Level := "DEBUG") {
-			Diablo2.Log.Message(this.Name, Message, Level)
-		}
 		__Call(Name, Args*) {
 			; Don't use this._Log, otherwise we'll recursively invoke __Call.
 			Message := Format("Feature with method ""{}"" unavailable", Name)
@@ -517,7 +577,7 @@ class Diablo2 {
 				Message .= Format(" (triggered by hotkey ""{}"")", A_ThisHotkey)
 			}
 			base._Log(Message)
-			Diablo2.Voice.Speak(this.Name . " unavailable", true)
+			Diablo2.Voice.Speak(this._Name . " unavailable", true)
 			Exit ; Exit current thread (e.g., the hotkey)
 		}
 	}
@@ -585,7 +645,7 @@ class Diablo2 {
 
 		; Auto-configure control for the game. To use, assign to a hotkey, visit "Configure Controls"
 		; screen, and press the hotkey.
-		AutoAssign() {
+		gAutoAssign() {
 			this._Log("Auto-assigning")
 
 			; Flatten the control list for easier duplicate detection.
@@ -638,10 +698,10 @@ class Diablo2 {
 					; Check for duplicates
 					DuplicateKeyFunction := KeyFunctions[Key]
 					if (DuplicateKeyFunction != "") {
-						Diablo2.Voice.Speak(Format("Duplicate key {} for {} and {}"
-							, Key, DuplicateKeyFunction, Function), true)
-							Diablo2.Fatal(Format("Duplicate key binding '{}' for '{}' and '{}'"
-								, Key, DuplicateKeyFunction, Function))
+						throw Exception(Format("Duplicate key binding '{}' for '{}' and '{}'"
+							, Key, DuplicateKeyFunction, Function)
+							,
+							, Format("Duplicate key, {}; for {} and {}" , Key, DuplicateKeyFunction, Function))
 					}
 					KeyFunctions[Key] := Function
 
@@ -654,25 +714,6 @@ class Diablo2 {
 			Diablo2.Send(SendStr)
 
 			this._Log("Controls assigned")
-		}
-
-		; Check to make sure a control is assigned, exiting with an error if not. The key binding is
-		; returned in Send syntax.
-		;
-		; Parameters:
-		; Function
-		;     Action the control performs
-		; Feature
-		;     Feature for which the control is needed
-		;
-		; Return value: The key in Send syntax
-		Require(Function, Feature) {
-			Key := this[Function]
-			if (Key == "") {
-				Diablo2.Voice.Speak(Format("Control {} required for {}", Function, Feature), true)
-				Diablo2.Fatal(Format("Control assignment for {} is required for {}", Function, Feature))
-			}
-			return Diablo2.HotkeySyntaxToSendSyntax(Key)
 		}
 	}
 
@@ -768,7 +809,7 @@ class Diablo2 {
 		_Skills := ["", ""]
 
 		__New(WeaponSetForSkill) {
-			this._SwapKey := Diablo2.Controls.Require("Swap Weapons", this.Name)
+			this._SwapKey := Diablo2.GetControl("Swap Weapons", true)
 
 			; Turn on context-sensitive hotkey creation
 			Hotkey, IfWinActive, % Diablo2.HotkeyCondition
@@ -825,7 +866,7 @@ class Diablo2 {
 		}
 
 		; Activate the skill represented by the assigned hotkey.
-		_HotkeyActivated() {
+		g_HotkeyActivated() {
 			this.Activate(A_ThisHotkey)
 		}
 
@@ -839,7 +880,7 @@ class Diablo2 {
 		; Key
 		;     The skill hotkey
 		;
-		OneOff(Key) {
+		gOneOff(Key) {
 			; There are times when it isn't necessary to save the state of LButton, but it's really
 			; useful, for example, to keep moving after performing a Teleport. It's useful enough that
 			; it's included as the default behavior.
@@ -867,11 +908,11 @@ class Diablo2 {
 		_Size := {}
 
 		__New(_) {
-			this._StandStillKey := Diablo2.Controls.Require("Stand Still", this.Name)
+			this._StandStillKey := Diablo2.GetControl("Stand Still", true)
 		}
 
 		; Begin an item selection.
-		SelectStart() {
+		gSelectStart() {
 			MouseGetPos, StartX, StartY
 			this._Log(Format("Selection start is {},{}", StartX, StartY))
 			this._Start := {X: StartX, Y: StartY}
@@ -879,7 +920,7 @@ class Diablo2 {
 		}
 
 		; Finish definition of an item selection.
-		SelectEnd() {
+		gSelectEnd() {
 			Start := this._Start
 			if (!Start.HasKey("X")) {
 				Message := "No selection started"
@@ -907,7 +948,7 @@ class Diablo2 {
 		}
 
 		; Drop items in selection at current mouse position.
-		Drop() {
+		gDrop() {
 			if (!this._HasSelection()) {
 				return
 			}
@@ -947,7 +988,7 @@ class Diablo2 {
 		}
 
 		; Move a block of single-cell items to set of empty cells.
-		MoveSingleCellItems() {
+		gMoveSingleCellItems() {
 			if (!this._HasSelection()) {
 				return
 			}
@@ -1013,8 +1054,10 @@ class Diablo2 {
 		_HasBitmaps := true
 
 		__New(Config) {
-			for _, Function in ["Inventory Screen", "Show Belt", "Clear Screen"] {
-				Diablo2.Controls.Require(Function, this.Name)
+			; Require necessary controls
+			for _, Function in ["Inventory Screen", "Show Belt", "Clear Screen", "Screen Shot"] {
+				; Don't save the return value; we just want to check that these keys are set.
+				Diablo2.GetControl(Function)
 			}
 			for _, Key in ["Fullscreen", "LesserFirst", "FullscreenPotionsPerScreenshot"] {
 				if Config.HasKey(Key) {
@@ -1048,8 +1091,7 @@ class Diablo2 {
 				; Start GDI+ for full screen
 				this._GdipToken := Gdip_Startup()
 				if (!this._GdipToken) {
-					Diablo2.Voice.Speak("GDI+ failed", true)
-					Diablo2.Fatal("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AutoHotkey")
+					throw Exception("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AutoHotkey.")
 				}
 			}
 			this._InitBitmaps()
@@ -1067,12 +1109,12 @@ class Diablo2 {
 		}
 
 		; Fill the belt with potions.
-		Activate() {
+		gActivate() {
 			this._Function.Call()
 		}
 
 		; Create needle bitmaps from the contents of the screen.
-		GenerateBitmaps() {
+		gGenerateBitmaps() {
 			this._Log("Generating new needle bitmaps")
 			Diablo2.ClearScreen()
 			Diablo2.OpenInventory()
@@ -1116,13 +1158,12 @@ class Diablo2 {
 				Diablo2.ClearScreen()
 				this._InitBitmaps()
 				if (this._HasBitmaps) {
-					Diablo2.Voice.Speak(this.Name . " enabled")
+					Diablo2.Voice.Speak(this._Name . " enabled")
 					this._Log("Enabled")
 				}
 				else {
 					Message := "Bitmaps still not found"
-					Diablo2.Voice.Speak(Message . ",  check log for details", true)
-					Diablo2.Fatal(Message)
+					throw Exception(Message, , Message)
 				}
 			}
 		}
@@ -1245,13 +1286,17 @@ WindowedSizeLoop:
 				for _, Size in Sizes {
 					NeedlePath := this._ImagePath(Type_, Size)
 					Loop {
-						ImageSearch, PotionX, PotionY
-							, % Diablo2.Inventory.TopLeft.X, % Diablo2.Inventory.TopLeft.Y
-							, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y
-							, % Format("*{} {}", this._Variation, NeedlePath)
-						if (ErrorLevel == 2) {
-							Diablo2.Voice.Speak("Fill potion error", true)
-							Diablo2.Fatal("Needle image file not found: " . NeedlePath)
+						try {
+							ImageSearch, PotionX, PotionY
+								, % Diablo2.Inventory.TopLeft.X, % Diablo2.Inventory.TopLeft.Y
+								, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y
+								, % Format("*{} {}", this._Variation, NeedlePath "a")
+						}
+						catch {
+							; XXX This should really be in a finally at the end... but, it doesn't work for some
+							; reason.
+							this._End()
+							throw Exception("Needle image file not found: " . NeedlePath)
 						}
 						if (ErrorLevel == 1) {
 							break ; Image not found on the screen.
@@ -1281,125 +1326,146 @@ WindowedSizeLoop:
 				this["_FullscreenState", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
 			}
 			Sleep, 100 ; Wait for the inventory to appear
-			Diablo2.TakeScreenshot(ObjBindMethod(this, "_FullscreenProcess"))
+			try {
+				Diablo2.TakeScreenshot(ObjBindMethod(this, "_FullscreenProcess"))
+			}
+			catch {
+				; XXX This should really be a finally... but, it doesn't work for some reason.
+				this._End()
+				throw Exc
+			}
 		}
 
 		; Process screenshot to fill the belt with potions in fullscreen mode.
 		_FullscreenProcess(HaystackPath) {
 			this._Log("Processing " . HaystackPath)
 
-			; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the bugs. w and h are supposed (?) to represent width and height; they are used as such in the AHK code but not the C code. This causes problems and an inability to find the needle. We are now using MasterFocus' Gdip_ImageSearch, which works well.
-			; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
-			HaystackBitmap := Diablo2.SafeCreateBitmapFromFile(HaystackPath)
-			; Assume we are finished for now; invalidate later if we are not.
-			Finished := true
+			HaystackBitmap := ""
+			try {
+				; In the past, we tried tic's Gdip_ImageSearch. However, it is broken as reported in the
+				; bugs. w and h are supposed (?) to represent width and height; they are used as such in the
+				; AHK code but not the C code. This causes problems and an inability to find the needle. We
+				; are now using MasterFocus' Gdip_ImageSearch, which works well.
+				; http://www.autohotkey.com/board/topic/71100-gdip-imagesearch/
+				HaystackBitmap := Diablo2.SafeCreateBitmapFromFile(HaystackPath)
+				; Assume we are finished for now; invalidate later if we are not.
+				Finished := true
 
-			for Type_, Sizes in this._Potions {
-				if (this._FullscreenState[Type_].Finished) {
-					; We have already finished finding potions of this type.
-					continue
-				}
-				PotionsClicked := []
+				for Type_, Sizes in this._Potions {
+					if (this._FullscreenState[Type_].Finished) {
+						; We have already finished finding potions of this type.
+						continue
+					}
+					PotionsClicked := []
 PotionSizeLoop:
-				Loop {
-					Size := Sizes[this._FullscreenState[Type_].SizeIndex]
-					this._LogWithSize(Type_, Size, "Searching")
-					NumPotionsFound := Gdip_ImageSearch(HaystackBitmap
-						, this._NeedleBitmaps[Type_][Size]
-						, CoordsListString
-						, Diablo2.Inventory.TopLeft.X, Diablo2.Inventory.TopLeft.Y
-						, Diablo2.Inventory.BottomRight.X, Diablo2.Inventory.BottomRight.Y
-						, this._Variation
-						; These two blank parameters are transparency color and search direction.
-						, ,
-						; For the number of instances to find, pass one more than the user requested so that we
-						; can terminate early if possible. If they passed 0, find all instances with 0.
-						, this._FullscreenPotionsPerScreenshot == 0 ? 0 : this._FullscreenPotionsPerScreenshot + 1)
+					Loop {
+						Size := Sizes[this._FullscreenState[Type_].SizeIndex]
+						this._LogWithSize(Type_, Size, "Searching")
+						NumPotionsFound := Gdip_ImageSearch(HaystackBitmap
+							, this._NeedleBitmaps[Type_][Size]
+							, CoordsListString
+							, Diablo2.Inventory.TopLeft.X, Diablo2.Inventory.TopLeft.Y
+							, Diablo2.Inventory.BottomRight.X, Diablo2.Inventory.BottomRight.Y
+							, this._Variation
+							; These two blank parameters are transparency color and search direction.
+							, ,
+							; For the number of instances to find, pass one more than the user requested so that we
+							; can terminate early if possible. If they passed 0, find all instances with 0.
+							, this._FullscreenPotionsPerScreenshot == 0 ? 0 : this._FullscreenPotionsPerScreenshot + 1)
 
-					; Anything less than 0 indicates an error.
-					if (NumPotionsFound < 0) {
-						Diablo2.Voice.Speak("Fill potion error", true)
-						Diablo2.Fatal("Gdip_ImageSearch call failed with error code " . NumPotionsFound)
-					}
-
-					; Collect all the potions we found into an array.
-					PotionsFound := []
-					for _3, CoordsString in StrSplit(CoordsListString, "`n") {
-						Coords := StrSplit(CoordsString, "`,")
-						PotionFound := {X: Coords[1], Y: Coords[2]}
-						this._LogWithSize(Type_, Size, Format("Found at {1},{2}", PotionFound.X, PotionFound.Y))
-						; If any of the potions found were clicked before, the belt is already full of this type
-						; and we are finished with it.
-						for _4, PotionClicked in this._FullscreenState[Type_].PotionsClicked {
-							if (PotionFound.X == PotionClicked.X and PotionFound.Y == PotionClicked.Y) {
-								this._FullscreenState[Type_].Finished := true
-								this._LogWithType(Type_, "Finished for run due to full belt")
-								break, PotionSizeLoop
-							}
+						; Anything less than 0 indicates an error.
+						if (NumPotionsFound < 0) {
+							throw Exception("Gdip_ImageSearch call failed with error code " . NumPotionsFound)
 						}
-						PotionsFound.Push(PotionFound)
+
+						; Collect all the potions we found into an array.
+						PotionsFound := []
+						for _3, CoordsString in StrSplit(CoordsListString, "`n") {
+							Coords := StrSplit(CoordsString, "`,")
+							PotionFound := {X: Coords[1], Y: Coords[2]}
+							this._LogWithSize(Type_, Size, Format("Found at {1},{2}", PotionFound.X, PotionFound.Y))
+							; If any of the potions found were clicked before, the belt is already full of this type
+							; and we are finished with it.
+							for _4, PotionClicked in this._FullscreenState[Type_].PotionsClicked {
+								if (PotionFound.X == PotionClicked.X and PotionFound.Y == PotionClicked.Y) {
+									this._FullscreenState[Type_].Finished := true
+									this._LogWithType(Type_, "Finished for run due to full belt")
+									break, PotionSizeLoop
+								}
+							}
+							PotionsFound.Push(PotionFound)
+						}
+
+						; Click potions.
+						NumPotionsToClick := (this._FullscreenPotionsPerScreenshot == 0
+							? NumPotionsFound
+							: Diablo2._Min(NumPotionsFound
+								, this._FullscreenPotionsPerScreenshot - PotionsClicked.Length()))
+						Loop, % NumPotionsToClick {
+							Potion := PotionsFound[A_Index]
+							this._LogWithSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
+							this._Click(Potion)
+							PotionsClicked.Push(Potion)
+						}
+
+						if (this._FullscreenPotionsPerScreenshot > 0
+							and PotionsClicked.Length() >= this._FullscreenPotionsPerScreenshot) {
+							; We can't click any more potions for this screenshot.
+							Finished := false
+							this._LogWithType(Type_, "Finished for screenshot")
+							break
+						}
+
+						; Move on to the next size.
+						++this._FullscreenState[Type_].SizeIndex
+
+						; Check to see if we have run out of potion sizes for this type. This has happened if
+						; the size index has been incremented beyond the bounds of the size array.
+						if this._FullscreenState[Type_].SizeIndex > Sizes.Length() {
+							this._FullscreenState[Type_].Finished := true
+							this._LogWithType(Type_, "Finished because no potions left")
+							break
+						}
 					}
 
-					; Click potions.
-					NumPotionsToClick := (this._FullscreenPotionsPerScreenshot == 0
-						? NumPotionsFound
-						: Diablo2._Min(NumPotionsFound
-							, this._FullscreenPotionsPerScreenshot - PotionsClicked.Length()))
-					Loop, % NumPotionsToClick {
-						Potion := PotionsFound[A_Index]
-						this._LogWithSize(Type_, Size, Format("Clicking {1},{2}", Potion.X, Potion.Y))
-						this._Click(Potion)
-						PotionsClicked.Push(Potion)
-					}
-
-					if (this._FullscreenPotionsPerScreenshot > 0
-						and PotionsClicked.Length() >= this._FullscreenPotionsPerScreenshot) {
-						; We can't click any more potions for this screenshot.
-						Finished := false
-						this._LogWithType(Type_, "Finished for screenshot")
-						break
-					}
-
-					; Move on to the next size.
-					++this._FullscreenState[Type_].SizeIndex
-
-					; Check to see if we have run out of potion sizes for this type. This has happened if
-					; the size index has been incremented beyond the bounds of the size array.
-					if this._FullscreenState[Type_].SizeIndex > Sizes.Length() {
-						this._FullscreenState[Type_].Finished := true
-						this._LogWithType(Type_, "Finished because no potions left")
-						break
-					}
+					; Record all the potions of this type we clicked for this screenshot.
+					this._FullscreenState[Type_].PotionsClicked := PotionsClicked
 				}
 
-				; Record all the potions of this type we clicked for this screenshot.
-				this._FullscreenState[Type_].PotionsClicked := PotionsClicked
-			}
-
-			Gdip_DisposeImage(HaystackBitmap)
-			; Remove the screen shot; it is not needed any more.
-			FileDelete, %HaystackPath%
-
-			if (Finished) {
-				; If we are still considered finished, check to see if every type has finished.
-				for Type_, Obj in this._FullscreenState {
-					if (!Obj.Finished) {
-						; We still have potions over which to iterate.
-						Finished := false
+				if (Finished) {
+					; If we are still considered finished, check to see if every type has finished.
+					for Type_, Obj in this._FullscreenState {
+						if (!Obj.Finished) {
+							; We still have potions over which to iterate.
+							Finished := false
+						}
 					}
 				}
+				if (Finished) {
+					this._StopWatchDirectory()
+					this._End()
+				}
+				else {
+					this._Log("Requesting updated screenshot")
+					; Wait slightly for the game to update
+					; Sleep, 100
+
+					; Get the next screenshot
+					Diablo2.Send(Diablo2._ScreenShotKey)
+				}
 			}
-			if (Finished) {
+			catch Exc {
+				; Stop watch, end filling of potions, then re-throw.
 				this._StopWatchDirectory()
 				this._End()
+				throw Exc
 			}
-			else {
-				this._Log("Requesting updated screenshot")
-				; Wait slightly for the game to update
-				; Sleep, 100
-
-				; Get the next screenshot
-				Diablo2.Send(Diablo2._ScreenShotKey)
+			finally {
+				if (HaystackBitmap) {
+					Gdip_DisposeImage(HaystackBitmap)
+				}
+				; Remove the screen shot regardless.
+				FileDelete, %HaystackPath%
 			}
 		}
 	}
