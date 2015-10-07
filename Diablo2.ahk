@@ -178,7 +178,7 @@ class Diablo2 {
 		for Name, Feature in this._Features {
 			Enabled := Feature.Enabled ? "Enabled" : "Disabled"
 			FeaturesByStatus[Enabled].Push(Name)
-			this.Log.Message(Name, Enabled_)
+			this.Log.Message(Name, Enabled)
 		}
 		SpeakStr := HotkeysActive
 		for _1, Enabled in ["Enabled", "Disabled"] {
