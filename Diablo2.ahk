@@ -778,8 +778,9 @@ class Diablo2 {
 
 			FileExisted := FileExist(this.Path)
 			this._FileObj := FileOpen(this.Path, "a")
-			if (FileExisted) {
-				; Separate this session from the last with a newline
+			; Separate this session from the last with a newline if the log file already existed and is
+			; not STDOUT (*) or STDERR (**).
+			if (FileExisted and !(this.Path == "*" or this.Path == "**")) {
 				this.Write("")
 			}
 		}
