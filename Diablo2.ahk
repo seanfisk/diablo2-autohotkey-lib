@@ -222,12 +222,12 @@ class Diablo2 {
 	; Message
 	;     Exception message
 	; SpeakStr
-	;     String to speak when exception is caught
+	;     String to speak when exception is caught. Pass as false to explicitly disable speech.
 	_Throw(Message, SpeakStr := "") {
 		; The Exception constructor DOES NOT support objects as the Extra argument!!!
 		Exc := Exception(Message
 			, -1) ; Don't include this function in the stack trace
-		if (SpeakStr) {
+		if (SpeakStr != "") {
 			Exc["Extra", "Speak"] := SpeakStr
 		}
 		throw Exc
@@ -450,7 +450,10 @@ class Diablo2 {
 			Diablo2.Log.Message(Feature, Message, "FATAL")
 			; Speaking asynchronously when the current thread is exiting causes inconsistent results.
 			; Just speak synchronously to be sure.
-			Diablo2.Voice.Speak(Exc.Extra.Speak ? Exc.Extra.Speak : (Feature . " error"), true)
+			Speak := Exc.Extra.Speak
+			if (Speak != false) {
+				Diablo2.Voice.Speak(Speak ? Speak : (Feature . " error"), true)
+			}
 		}
 	}
 
@@ -826,6 +829,8 @@ class Diablo2 {
 	class _SkillsFeature extends Diablo2._EnabledFeature {
 		_Max := 16
 		_WeaponSetForKey := {}
+		_SwapDisabled := false
+		_SwapWaitingKey := ""
 		_WeaponSet := 1
 		_Skills := ["", ""]
 
@@ -838,7 +843,9 @@ class Diablo2 {
 			Loop, % this._Max {
 				Key := Diablo2.Controls.Skills[A_Index]
 				if (Key != "") {
-					this._WeaponSetForKey[Key] := WeaponSetForSkill[A_Index]
+					WeaponSet := WeaponSetForSkill[A_Index]
+					this._WeaponSetForKey[Key] := WeaponSet
+					this._WeaponSetKeys[WeaponSet].Push(Key)
 					; Make each skill a hotkey so we can track the current skill.
 					Hotkeys[Key] := HotkeyFunc
 				}
@@ -861,9 +868,20 @@ class Diablo2 {
 		Activate(Key) {
 			PreferredWeaponSet := this._WeaponSetForKey[Key]
 			ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != this._WeaponSet)
+			; Activating any skill hotkey cancels any previous key waiting for swap to be re-enabled.
+			this._SwapWaitingKey := ""
 
 			if (ShouldSwapWeaponSet) {
-				; Swap to the other weapon
+				; If the skill requested needs to swap weapons but swapping is currently disabled, set the
+				; skill to be activated after a timeout.
+				if (this._SwapDisabled) {
+					this._SwapWaitingKey := Key
+					Diablo2._Throw(Format("Swapping disabled; will activate '{}' when ready" , Key), false)
+				}
+				; Temporarily disable swapping so that the user cannot immediately cause a swap back to the
+				; other weapon set, which tends to de-synchronize the macros and the game.
+				this._DisableSwap()
+				; Swap to the other weapon set.
 				this._Log("Swapping to weapon set " . PreferredWeaponSet)
 				Diablo2.Send(this._SwapKey)
 				this._WeaponSet := PreferredWeaponSet
@@ -879,6 +897,27 @@ class Diablo2 {
 				Diablo2.Send(Diablo2.HotkeySyntaxToSendSyntax(Key))
 
 				this._Skills[this._WeaponSet] := Key
+			}
+		}
+
+		; Block the user from swapping weapons.
+		_DisableSwap() {
+			this._SwapDisabled := true
+			this._Log("Swapping disabled")
+			; Now set up a timer to re-enable swapping.
+			Function := ObjBindMethod(this, "_EnableSwap")
+			; A negative period sets up a one-off timer.
+			SetTimer, %Function%, -1200
+		}
+
+		; Unblock the user from swapping weapons, activated a swap-required skill if it was the
+		; requested.
+		_EnableSwap() {
+			this._SwapDisabled := false
+			this._Log("Swapping enabled")
+			if (this._SwapWaitingKey) {
+				this._Log(Format("Activating '{}' which required swap", this._SwapWaitingKey))
+				this.Activate(this._SwapWaitingKey)
 			}
 		}
 
