@@ -40,6 +40,8 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 		, "^!b": "FillPotion.GenerateBitmaps"
 		, "^!r": "Reset"
 		, "^!t": "Status"
+		; Exits the entire program from within a created Battle.Net game.
+		, "^!q": "QuitBattleNetGame"
 		; Just 'f' runs FillPotion.
 		, "f": "FillPotion.Activate"
 		; Enable the right-click fix globally.

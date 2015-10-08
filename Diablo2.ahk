@@ -179,6 +179,20 @@ class Diablo2 {
 		this._Init()
 	}
 
+	; Exit the entire program from within a created Battle.Net game.
+	QuitBattleNetGame() {
+		this.ClearScreen()
+		this.Send("{Escape}") ; Bring up the menu
+		Sleep, 50
+		Click, 392, 259 ; "Save and Exit Game" on the in-game menu
+		Sleep, 9000 ; This can take forever
+		Click, 734, 479 ; "Quit" on the game create/join screen
+		Sleep, 1000
+		Click, 94, 553 ; "Exit" on the character selection screen
+		Sleep, 1000
+		Click, 405, 550 ; "Exit Diablo II" on the title screen
+	}
+
 	; Return the keybinding for a certain control, throwing if it is not assigned.
 	;
 	; Parameters:
