@@ -335,9 +335,6 @@ class Diablo2 {
 	TakeScreenshot(CallbackFunc) {
 		ScreenShotKey := this.GetControl("Screen Shot", true)
 		; WatchDirectory doesn't support callbacks of type BoundFunc, only Func. Deploy workaround.
-		;
-		; XXX If exceptions occur in this callback, they won't be reported as an error with this
-		; specific feature and instead be reported as "Global". That's an acceptable compromise, I guess.
 		this._ScreenshotCallback := ObjBindMethod(Diablo2, "_CatchExceptions", CallbackFunc)
 		; Note: InstallPath has a trailing slash
 		; Triple question marks ("???") don't seem to work, but "*" should be fine.
@@ -1383,7 +1380,7 @@ WindowedSizeLoop:
 		}
 
 		; Process screenshot to fill the belt with potions in fullscreen mode.
-		_FullscreenProcess(HaystackPath) {
+		g_FullscreenProcess(HaystackPath) {
 			this._Log("Processing " . HaystackPath)
 
 			HaystackBitmap := ""
