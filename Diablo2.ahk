@@ -57,7 +57,7 @@ class Diablo2 {
 		, Steam: "ExitThread"}
 	; Use an object for HasKey because arrays don't have a Contains-type method presumably, HasKey
 	; operates in O(1) and would be faster than writing our own Contains.
-	static _SuspensionExempt := {"Suspend": ""
+	static _SuspendPermit := {"Suspend": ""
 		, "Exit": ""
 		, "Steam.OverlayToggle": ""
 		, "Steam.BrowserOpenTabs": ""}
@@ -124,9 +124,9 @@ class Diablo2 {
 		if (Key == "") {
 			this._Throw("Empty key for function: " . (FunctionType == "String" ? Function : Function.Name))
 		}
-		if (FunctionType == "String" and this._SuspensionExempt.HasKey(Function)) {
-			; Due to AHK limitations, "Suspend, *" doesn't work in a function reference. A suspension
-			; exempt function therefore cannot support arguments.
+		if (FunctionType == "String" and this._SuspendPermit.HasKey(Function)) {
+			; Due to AHK limitations, "Suspend, *" doesn't work in a function reference. A suspend permit
+			;  function therefore cannot support arguments.
 			if (Args.Length() > 0) {
 				this._Throw("Arguments not supported for suspend permit function: " . Function)
 			}
@@ -1522,7 +1522,7 @@ PotionSizeLoop:
 		__New(Config) {
 			; We want Steam.BrowserOpenTabs() to run under suspension because hotkeys should be suspended
 			; when the overlay is open. Because Suspend, Permit does not work in function references, a
-			; hotkey which calls a Suspend, Permit function cannot accept arguments. We therefore have to
+			; hotkey which calls a suspend permit function cannot accept arguments. We therefore have to
 			; accept BrowserTabs as a configuration option instead of an argument to
 			; Steam.BrowserOpenTabs().
 			for _, Key in ["OverlayKey", "BrowserTabUrls"] {
