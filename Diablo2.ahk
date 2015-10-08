@@ -59,6 +59,7 @@ class Diablo2 {
 	; operates in O(1) and would be faster than writing our own Contains.
 	static _SuspendPermit := {"Suspend": ""
 		, "Exit": ""
+		, "Status": ""
 		, "Steam.OverlayToggle": ""
 		, "Steam.BrowserOpenTabs": ""}
 
@@ -170,34 +171,6 @@ class Diablo2 {
 		for Key, Binding in Bindings {
 			this.Assign(Key, Binding, GameOnly)
 		}
-	}
-
-	; Report status of the macros.
-	Status() {
-		this.Log.Message("Global", "Logging status report")
-		HotkeysActive := "Hotkeys " . (A_IsSuspended ? "Suspended" : "Active")
-		Diablo2.Log.Message("Global", HotkeysActive)
-		SpeakStr := HotkeysActive
-		FeaturesByStatus := {Enabled: [], Disabled: []}
-		for Name, Feature in this._Features {
-			Enabled := Feature.Enabled ? "Enabled" : "Disabled"
-			FeaturesByStatus[Enabled].Push(Name)
-			this.Log.Message(Name, Enabled)
-		}
-		SpeakStr := HotkeysActive
-		for _1, Enabled in ["Enabled", "Disabled"] {
-			SpeakStr .= Format(", {} features", Enabled)
-			Features := FeaturesByStatus[Enabled]
-			if (Features.Length() > 0) {
-				for _2, Feature in Features {
-					SpeakStr .= ", " . Feature
-				}
-			}
-			else {
-				SpeakStr .= ", None"
-			}
-		}
-		Diablo2.Voice.Speak(SpeakStr)
 	}
 
 	; Reset the state of the macros.
@@ -1566,6 +1539,35 @@ _Diablo2_Exit() {
 	Suspend, Permit
 	Diablo2.Voice.Speak("Exiting", true)
 	ExitApp
+}
+
+; Report status of the macros.
+_Diablo2_Status() {
+	Suspend, Permit
+	Diablo2.Log.Message("Global", "Logging status report")
+	HotkeysActive := "Hotkeys " . (A_IsSuspended ? "Suspended" : "Active")
+	Diablo2.Log.Message("Global", HotkeysActive)
+	SpeakStr := HotkeysActive
+	FeaturesByStatus := {Enabled: [], Disabled: []}
+	for Name, Feature in Diablo2._Features {
+		Enabled := Feature.Enabled ? "Enabled" : "Disabled"
+		FeaturesByStatus[Enabled].Push(Name)
+		Diablo2.Log.Message(Name, Enabled)
+	}
+	SpeakStr := HotkeysActive
+	for _1, Enabled in ["Enabled", "Disabled"] {
+		SpeakStr .= Format(", {} features", Enabled)
+		Features := FeaturesByStatus[Enabled]
+		if (Features.Length() > 0) {
+			for _2, Feature in Features {
+				SpeakStr .= ", " . Feature
+			}
+		}
+		else {
+			SpeakStr .= ", None"
+		}
+	}
+	Diablo2.Voice.Speak(SpeakStr)
 }
 
 ; Toggle the Steam overlay.
