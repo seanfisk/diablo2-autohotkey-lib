@@ -35,6 +35,7 @@ SendMode, Input
 
 #Include <JSON>
 #Include <TTSConstants>
+#Include <vtype>
 
 ; This is a static namespace class which serves to contain all the library features and functions.
 ; It is not intended to be subclassed via the 'new' operator.
@@ -90,12 +91,13 @@ class Diablo2 {
 	; Key
 	;     Key to bind
 	; Binding
-	;     This can be one of two things:
+	;     This can be one of three things:
 	;     - A function name to assign to hotkey (no arguments passed)
 	;     - An object with Function and Args key-value pairs. Function is a string representing the
 	;       name of the function to assign, and Args is an array of arguments.
+	;     - A Func or BoundFunc object (arguments must already be bound)
 	; GameOnly
-	;     Whether the hotkey should be activated only in-game
+	;     Whether the hotkey should be activated only in-game (default: true)
 	;
 	; Examples:
 	;
@@ -107,9 +109,9 @@ class Diablo2 {
 	; Diablo2.Assign(Key, {Function: "Skills.OneOff", Args: [Key]})
 	;
 	Assign(Key, Binding, GameOnly := true) {
-		if (IsObject(Binding)) {
+		if (vtype(Binding) == "Object") {
 			if (!(Binding.HasKey("Function") and Binding.HasKey("Args"))) {
-				throw Exception("Invalid object giving for Binding; must have ""Function"" and ""Args"" keys")
+				this._Throw("Invalid object giving for Binding; must have ""Function"" and ""Args"" keys")
 			}
 			Function := Binding.Function
 			Args := Binding.Args
@@ -118,38 +120,40 @@ class Diablo2 {
 			Function := Binding
 			Args := []
 		}
+		FunctionType := vtype(Function)
 		if (Key == "") {
-			throw Exception("Empty key for function: " . Function)
+			this._Throw("Empty key for function: " . (FunctionType == "String" ? Function : Function.Name))
 		}
-		if (GameOnly) {
-			; Turn on context-sensitive hotkey creation
-			Hotkey, IfWinActive, % this.HotkeyCondition
-		}
-		if (this._SuspensionExempt.HasKey(Function)) {
+		if (FunctionType == "String" and this._SuspensionExempt.HasKey(Function)) {
 			; Due to AHK limitations, "Suspend, *" doesn't work in a function reference. A suspension
 			; exempt function therefore cannot support arguments.
 			if (Args.Length() > 0) {
-				throw Exception("Arguments not supported for suspend permit function: " . Function)
+				this._Throw("Arguments not supported for suspend permit function: " . Function)
 			}
+			; Convert the function name to a matching suspend permit function.
 			Function := "_Diablo2_" . StrReplace(Function, ".", "_")
 		}
 		else {
-			Components := StrSplit(Function, ".")
-			MethodName := Components.Pop()
-			Obj := this
-			for _, Component in Components {
-				if (!Obj.HasKey(Component)) {
-					throw Exception("Invalid component: " . Component)
+			; Resolve the function and bind arguments if it is a string.
+			if (FunctionType == "String") {
+				Components := StrSplit(Function, ".")
+				MethodName := Components.Pop()
+				Obj := this
+				for _, Component in Components {
+					if (!Obj.HasKey(Component)) {
+						this._Throw("Invalid component: " . Component)
+					}
+					Obj := Obj[Component]
 				}
-				Obj := Obj[Component]
+				Function := ObjBindMethod(Obj, MethodName, Args*)
 			}
-			Function := ObjBindMethod(Obj, MethodName, Args*)
+			; Wrap the function to catch all exceptions.
+			Function := ObjBindMethod(Diablo2, "_CatchExceptions", Function)
+		}
+		if (GameOnly) {
+			HCC := new this._HotkeyConditionContext()
 		}
 		Hotkey, %Key%, %Function%
-		if (GameOnly) {
-			; Turn off context-sensitivity
-			Hotkey, IfWinActive
-		}
 	}
 
 	; Assign mulitple hotkeys to library functions. This is a wrapper around the Hotkey command
@@ -158,8 +162,8 @@ class Diablo2 {
 	; Parameters:
 	; Bindings
 	;     Mapping of hotkey to library function. Keys of Bindings are strings representing the hotkey
-	;     to bind. Values can be any valid Bind argument to Diablo2.Assign() [a function name string
-	;     or an object with Function and Args keys].
+	;     to bind. Values can be any valid Bind argument to Diablo2.Assign() [a function name,
+	;     function object, or object with Function and Args keys].
 	; GameOnly
 	;     Whether the hotkey should be activated only in-game
 	AssignMultiple(Bindings, GameOnly := true) {
@@ -214,10 +218,10 @@ class Diablo2 {
 	GetControl(Function, SendSyntax := false) {
 		Key := Diablo2.Controls[Function]
 		if (Key == "") {
-			throw Exception("Control assignment required: " . Function, , Function . " key required")
+			this._Throw("Control assignment required: " . Function, Function . " key required")
 		}
 		if (SendSyntax) {
-			return Diablo2.HotkeySyntaxToSendSyntax(Key)
+			return this.HotkeySyntaxToSendSyntax(Key)
 		}
 		return Key
 	}
@@ -239,6 +243,23 @@ class Diablo2 {
 	 SendInput, %Keys%
 	}
 
+	; Throw an exception with an optional speaking string.
+	;
+	; Parameters:
+	; Message
+	;     Exception message
+	; SpeakStr
+	;     String to speak when exception is caught
+	_Throw(Message, SpeakStr := "") {
+		; The Exception constructor DOES NOT support objects as the Extra argument!!!
+		Exc := Exception(Message
+			, -1) ; Don't include this function in the stack trace
+		if (SpeakStr) {
+			Exc["Extra", "Speak"] := SpeakStr
+		}
+		throw Exc
+	}
+
 	; Perform a right-click while keeping the left mouse button down.
 	;
 	; Diablo II has an annoying behavior whereby right-clicking causes the left mouse button not to be
@@ -249,7 +270,7 @@ class Diablo2 {
 	;     RButton::Diablo2_RightClick()
 	;
 	RightClick() {
-		LBRestore := new Diablo2._LButtonRestore()
+		LBRestore := new this._LButtonRestore()
 		this.Send("{RButton down}")
 		KeyWait, RButton
 		this.Send("{RButton up}")
@@ -314,7 +335,10 @@ class Diablo2 {
 	TakeScreenshot(CallbackFunc) {
 		ScreenShotKey := this.GetControl("Screen Shot", true)
 		; WatchDirectory doesn't support callbacks of type BoundFunc, only Func. Deploy workaround.
-		this._ScreenshotCallback := CallbackFunc
+		;
+		; XXX If exceptions occur in this callback, they won't be reported as an error with this
+		; specific feature and instead be reported as "Global". That's an acceptable compromise, I guess.
+		this._ScreenshotCallback := ObjBindMethod(Diablo2, "_CatchExceptions", CallbackFunc)
 		; Note: InstallPath has a trailing slash
 		; Triple question marks ("???") don't seem to work, but "*" should be fine.
 		RetCode := WatchDirectory(this._InstallPath . "|Screenshot*.jpg"
@@ -323,9 +347,9 @@ class Diablo2 {
 			; screenshot.
 			, 0x10)
 		if (RetCode < 0) {
-			throw Exception("WatchDirectory exited with " . RetCode)
+			this._Throw("WatchDirectory exited with " . RetCode)
 		}
-		Diablo2.Send(ScreenShotKey)
+		this.Send(ScreenShotKey)
 	}
 
 	; Safely create a bitmap from a file.
@@ -338,7 +362,7 @@ class Diablo2 {
 	SafeCreateBitmapFromFile(FilePath) {
 		Bitmap := Gdip_CreateBitmapFromFile(FilePath)
 		if (Bitmap <= 0) {
-			throw Exception("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
+			this._Throw("Gdip_CreateBitmapFromFile failed to create bitmap from " . FilePath)
 		}
 		return Bitmap
 	}
@@ -391,7 +415,7 @@ class Diablo2 {
 			FileRead, FileContents, %PathOrObject%
 		}
 		catch {
-			throw Exception("Error reading file " . PathOrObject)
+			this._Throw("Error reading file " . PathOrObject)
 		}
 		return JSON.Load(FileContents, true)
 	}
@@ -409,6 +433,55 @@ class Diablo2 {
 	; Return the maximum of two parameters.
 	_Max(A, B) {
 		return A > B ? A : B
+	}
+
+	; Call a BoundFunc, catching all exceptions and logging/announcing them then exiting the current
+	; thread. This is intended to be used by any function that is called in-game. Using "throw" in
+	; this way has several advantages:
+	;
+	; Over returning directly from the function:
+	;
+	; - Functions deeper in the stack can throw and it will be handled in the same way as if the
+	;		hotkey function had thrown. This means the hotkey function itself can safely ignore (not
+	;		catch) any of those errors; they will be logged without any additional work.
+	;
+	; Over a global exit function (previously Diablo2.Fatal()):
+	;
+	; - Throw utilizes an existing language feature; it is not specific to this library. Therefore,
+	;   any existing libraries using it will happily work without modification.
+	; - Functions used both inside and outside of the game will work the same: outside the game, a
+	;   dialog will result; inside the game, the error will be logged and announced.
+	;
+	; Disadvantages:
+	;
+	; - The call interception code is a bit more complex than either of the other solutions.
+	;
+	;
+	; Parameters:
+	; Function
+	;     The Func or BoundFunc to call
+	; Args*
+	;     Any extra arguments to pass to the function
+	;
+	; Returns: the return value of the function, if it didn't throw
+	_CatchExceptions(Function, Args*) {
+		try {
+			return Function.Call(Args*)
+		}
+		catch Exc {
+			; Feature are used in-game, so don't display a dialog. Instead, write to the log, announce
+			; via speech, and exit the current thread.
+			Message := Exc.Message
+			if (A_ThisHotkey != "") {
+				Message .= Format(" [Hotkey: {}]", A_ThisHotkey)
+			}
+			; If the Exception has an Extra key, use it for more information.
+			Feature := Exc.Extra.Feature ? Exc.Extra.Feature : "Global"
+			Diablo2.Log.Message(Feature, Message, "FATAL")
+			; Speaking asynchronously when the current thread is exiting causes inconsistent results.
+			; Just speak synchronously to be sure.
+			Diablo2.Voice.Speak(Exc.Extra.Speak ? Exc.Extra.Speak : (Feature . " error"), true)
+		}
 	}
 
 	; Run the game with the command-line flag -skiptobnet, which starts the game right at the
@@ -439,6 +512,18 @@ class Diablo2 {
 	}
 
 	; Private classes
+	class _HotkeyConditionContext {
+		; Use RAII to manage hotkey context.
+		__New() {
+			; Turn on context-sensitive hotkey creation
+			Hotkey, IfWinActive, % Diablo2.HotkeyCondition
+		}
+
+		__Delete() {
+			Hotkey, IfWinActive
+		}
+	}
+
 	class _LButtonRestore {
 		_IsDown := false
 		; Use RAII to save and restore the state of LButton.
@@ -511,26 +596,8 @@ class Diablo2 {
 
 		; Intercept all calls and redirect to a function with "g" as a prefix. A "g" prefix means the
 		; function is intended to be assigned to an in-game hotkey. In this case, we'll catch all
-		; exceptions and log/announce them while exiting the current thread. This has several
-		; advantages:
-		;
-		; Over returning directly from the hotkey function:
-		;
-		; - Functions deeper in the stack can throw and it will be handled in the same way as if the
-		;		hotkey function had thrown. This means the hotkey function itself can safely ignore (not
-		;		catch) any of those errors; they will be logged without any additional work.
-		;
-		; Over a global exit function (previously Diablo2.Fatal()):
-		;
-		; - Throw utilizes an existing language feature; it is not specific to this library. Therefore,
-		;   any existing libraries using it will happily work without modification.
-		; - Functions used both inside and outside of the game will work the same: outside the game, a
-		;   dialog will result; inside the game, the error will be logged and announced.
-		;
-		; Disadvantages:
-		;
-		; - The call interception code is a bit more complex than either of the other solutions.
-		;
+		; exceptions and tack on the name of the feature. If the hotkey was assigned with
+		; Diablo2.Assign(), the exception will be caught and logged/announced.
 		__Call(Name, Params*) {
 			RealName := "g" . Name
 			if (IsFunc(this[RealName])) {
@@ -538,20 +605,9 @@ class Diablo2 {
 					return this[RealName](Params*)
 				}
 				catch Exc {
-					; Feature are used in-game, so don't display a dialog. Instead, write to the log, announce
-					; via speech, and exit the current thread.
-					Message := Exc.Message
-					if (A_ThisHotkey != "") {
-						Message .= Format(" [Hotkey: {}]", A_ThisHotkey)
-					}
-					base._Log(Message, "FATAL")
-					; If the Exception has an Extra key, speak whatever that is.
-					;
-					; Speaking asynchronously when the current thread is exiting causes inconsistent results.
-					; Just speak synchronously to be sure.
-					Diablo2.Voice.Speak(Exc.HasKey("Extra") ? Exc.Extra : this._Name . " error", true)
-					; Exit the hotkey function. In most cases, this will exit the current thread.
-					return
+					; Tack on the feature name and re-throw.
+					Exc["Extra", "Feature"] := this._Name
+					throw Exc
 				}
 			}
 		}
@@ -571,14 +627,9 @@ class Diablo2 {
 
 	class _ExitThreadFeature extends Diablo2._DisabledFeature {
 		__Call(Name, Args*) {
-			; Don't use this._Log, otherwise we'll recursively invoke __Call.
-			Message := Format("Feature with method ""{}"" unavailable", Name)
-			if (A_ThisHotkey) {
-				Message .= Format(" (triggered by hotkey ""{}"")", A_ThisHotkey)
-			}
-			base._Log(Message)
-			Diablo2.Voice.Speak(this._Name . " unavailable", true)
-			Exit ; Exit current thread (e.g., the hotkey)
+			Exc := Exception(Format("Feature with method ""{}"" unavailable", Name))
+			Exc.Extra := {Feature: this._Name, Speak: this._Name . " unavailable"}
+			throw Exc
 		}
 	}
 
@@ -698,9 +749,8 @@ class Diablo2 {
 					; Check for duplicates
 					DuplicateKeyFunction := KeyFunctions[Key]
 					if (DuplicateKeyFunction != "") {
-						throw Exception(Format("Duplicate key binding '{}' for '{}' and '{}'"
-							, Key, DuplicateKeyFunction, Function)
-							,
+						Diablo2._Throw(Format("Duplicate key binding '{}' for '{}' and '{}'"
+								, Key, DuplicateKeyFunction, Function)
 							, Format("Duplicate key, {}; for {} and {}" , Key, DuplicateKeyFunction, Function))
 					}
 					KeyFunctions[Key] := Function
@@ -811,22 +861,18 @@ class Diablo2 {
 		__New(WeaponSetForSkill) {
 			this._SwapKey := Diablo2.GetControl("Swap Weapons", true)
 
-			; Turn on context-sensitive hotkey creation
-			Hotkey, IfWinActive, % Diablo2.HotkeyCondition
-
 			; Read the config file and assign hotkeys
 			HotkeyFunc := ObjBindMethod(this, "_HotkeyActivated")
+			Hotkeys := {}
 			Loop, % this._Max {
 				Key := Diablo2.Controls.Skills[A_Index]
 				if (Key != "") {
 					this._WeaponSetForKey[Key] := WeaponSetForSkill[A_Index]
 					; Make each skill a hotkey so we can track the current skill.
-					Hotkey, %Key%, %HotkeyFunc%
+					Hotkeys[Key] := HotkeyFunc
 				}
 			}
-
-			; Turn off context-sensitivity
-			Hotkey, IfWinActive
+			Diablo2.AssignMultiple(Hotkeys)
 		}
 
 		; Get the current skill (represented by its hotkey).
@@ -1091,7 +1137,7 @@ class Diablo2 {
 				; Start GDI+ for full screen
 				this._GdipToken := Gdip_Startup()
 				if (!this._GdipToken) {
-					throw Exception("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AutoHotkey.")
+					Diablo2._Throw("GDI+ failed to start. Please ensure you have GDI+ on your system and that you are running a 32-bit version of AutoHotkey.")
 				}
 			}
 			this._InitBitmaps()
@@ -1163,7 +1209,7 @@ class Diablo2 {
 				}
 				else {
 					Message := "Bitmaps still not found"
-					throw Exception(Message, , Message)
+					Diablo2._Throw(Message, , {Speak: Message})
 				}
 			}
 		}
@@ -1290,13 +1336,13 @@ WindowedSizeLoop:
 							ImageSearch, PotionX, PotionY
 								, % Diablo2.Inventory.TopLeft.X, % Diablo2.Inventory.TopLeft.Y
 								, % Diablo2.Inventory.BottomRight.X, % Diablo2.Inventory.BottomRight.Y
-								, % Format("*{} {}", this._Variation, NeedlePath "a")
+								, % Format("*{} {}", this._Variation, NeedlePath)
 						}
 						catch {
 							; XXX This should really be in a finally at the end... but, it doesn't work for some
 							; reason.
 							this._End()
-							throw Exception("Needle image file not found: " . NeedlePath)
+							Diablo2._Throw("Needle image file not found: " . NeedlePath)
 						}
 						if (ErrorLevel == 1) {
 							break ; Image not found on the screen.
@@ -1375,7 +1421,7 @@ PotionSizeLoop:
 
 						; Anything less than 0 indicates an error.
 						if (NumPotionsFound < 0) {
-							throw Exception("Gdip_ImageSearch call failed with error code " . NumPotionsFound)
+							Diablo2._Throw("Gdip_ImageSearch call failed with error code " . NumPotionsFound)
 						}
 
 						; Collect all the potions we found into an array.
@@ -1451,7 +1497,7 @@ PotionSizeLoop:
 					; Sleep, 100
 
 					; Get the next screenshot
-					Diablo2.Send(Diablo2._ScreenShotKey)
+					Diablo2.Send(this.GetControl("Screen Shot", true))
 				}
 			}
 			catch Exc {

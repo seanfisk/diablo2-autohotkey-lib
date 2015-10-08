@@ -13,3 +13,6 @@
 [submodule "Vendor/MasterFocus"]
 	path = Vendor/MasterFocus
 	url = https://github.com/MasterFocus/AutoHotkey.git
+[submodule "Vendor/Util"]
+	path = Vendor/Util
+	url = https://github.com/cocobelgica/AutoHotkey-Util.git
