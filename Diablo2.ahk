@@ -681,7 +681,7 @@ class Diablo2 {
 			; Skills and Belt
 			for ControlType, ControlSize in this._NumMultiControl {
 				this[ControlType] := []
-				; Initilize default of "" (which means "no assignment")
+				; Initialize default of "" (which means "no assignment")
 				Loop, %ControlSize% {
 					this[ControlType].Push("")
 				}
