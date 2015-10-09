@@ -279,14 +279,6 @@ class Diablo2 {
 		return HotkeyString
 	}
 
-	; Turn on/off suspension of hotkeys and input blocking.
-	SuspendAndBlock(Enable) {
-		; XXX BlockInput apparently doesn't work without Administrator privileges.
-		Mode := Enable ? "On": "Off"
-		Suspend, %Mode%
-		BlockInput, %Mode%
-	}
-
 	; Run the game, disabling the macros until the user has joined a game.
 	;
 	; Also see Steam.LaunchGame() for launching the game through Steam (which enables the Steam
