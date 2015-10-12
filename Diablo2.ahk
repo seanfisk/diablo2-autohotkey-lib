@@ -1514,7 +1514,7 @@ PotionSizeLoop:
 					; Sleep, 100
 
 					; Get the next screenshot
-					Diablo2.Send(this.GetControl("Screen Shot", true))
+					Diablo2.Send(Diablo2.GetControl("Screen Shot", true))
 				}
 			}
 			catch Exc {
