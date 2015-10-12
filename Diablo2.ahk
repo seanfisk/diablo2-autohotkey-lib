@@ -1500,6 +1500,7 @@ PotionSizeLoop:
 						if (!Obj.Finished) {
 							; We still have potions over which to iterate.
 							Finished := false
+							break
 						}
 					}
 				}
