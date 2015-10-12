@@ -1654,11 +1654,11 @@ _Diablo2_Steam_BrowserOpenTabs() {
 		; Click where the user had the mouse.
 		Click, %MouseX%, %MouseY%
 		Sleep, 100
-		SetKeyDelay, 0, 2
+		SetKeyDelay, 0, 10
 		SendEvent, {Raw}%Url%
 		SendEvent, {Enter}
 		; Let the tab load a bit. If we don't do this, the tab usually ends up in error.
-		Sleep, 150
+		Sleep, 1000
 	}
 
 	; Don't resume hotkeys because we are still in the overlay. If the user is using the Steam
