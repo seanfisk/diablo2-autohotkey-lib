@@ -260,7 +260,11 @@ class Diablo2 {
 	;
 	RightClick() {
 		LBRestore := new this._LButtonRestore()
-		this.Send("{RButton down}")
+		; The game won't allow the RButton hold action (e.g., repeatedly activating a skill) to happen
+		; if the LButton is down.
+		;
+		; For some reason, this works far more reliably if {RButton down} comes before {LButton up}.
+		this.Send("{RButton down}{LButton up}")
 		KeyWait, RButton
 		this.Send("{RButton up}")
 	}
@@ -514,7 +518,7 @@ class Diablo2 {
 
 		__Delete() {
 			if (this._IsDown) {
-				; When using SendInput, it is so fast that the game needs time to react.
+				; Give the game time to complete the action it was taking before this.
 				Sleep, 50
 				Diablo2.Send("{LButton down}")
 			}
@@ -945,10 +949,11 @@ class Diablo2 {
 		;     The skill hotkey
 		;
 		gOneOff(Key) {
+			ThisHotkey := A_ThisHotkey
 			; There are times when it isn't necessary to save the state of LButton, but it's really
 			; useful, for example, to keep moving after performing a Teleport. It's useful enough that
 			; it's included as the default behavior.
-			LBRestore := new LButtonRestore()
+			LBRestore := new Diablo2._LButtonRestore()
 			OldSkill := this.Get()
 			OldWeaponSet := this._WeaponSet
 			this.Activate(Key)
@@ -958,7 +963,12 @@ class Diablo2 {
 			if (HadToSwap) {
 				Sleep, 600
 			}
-			Click, Right
+			; Some skills (e.g., Teleport) have trouble when LButton is held.
+			Diablo2.Send("{RButton down}{LButton up}")
+			; Wait for the hotkey to be physically released (default).
+			KeyWait, %ThisHotkey%
+			Diablo2.Send("{RButton up}")
+			LBRestore := "" ; Restore the LButton state
 			if (HadToSwap) {
 				Sleep, 600
 			}
