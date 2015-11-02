@@ -906,10 +906,12 @@ class Diablo2 {
 					Sleep, 70
 				}
 				this._Log(Format("Switching to skill on '{}'", Key))
-				Diablo2.Send(Diablo2.HotkeySyntaxToSendSyntax(Key))
-
 				this._Skills[this._WeaponSet] := Key
 			}
+			; The skill key shouldn't need to be sent if we're already on it. However, sending it actually
+			; helps in cases where the macros and the game are out-of-sync, and the game is on the wrong
+			; skill.
+			Diablo2.Send(Diablo2.HotkeySyntaxToSendSyntax(Key))
 		}
 
 		; Block the user from swapping weapons.
