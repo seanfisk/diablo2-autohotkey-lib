@@ -840,9 +840,9 @@ class Diablo2 {
 
 	class _SkillsFeature extends Diablo2._EnabledFeature {
 		_Max := 16
-		_WeaponSetForKey := {}
+		_SkillInfo := {}
 		_SwapDisabled := false
-		_SwapWaitingKey := ""
+		_SwapWaitingSkill := ""
 		_WeaponSet := 1
 		_Skills := ["", ""]
 
@@ -850,45 +850,49 @@ class Diablo2 {
 			this._SwapKey := Diablo2.GetControl("Swap Weapons", true)
 
 			; Read the config file and assign hotkeys
-			HotkeyFunc := ObjBindMethod(this, "_HotkeyActivated")
 			Hotkeys := {}
 			Loop, % this._Max {
 				Key := Diablo2.Controls.Skills[A_Index]
 				if (Key != "") {
-					WeaponSet := WeaponSetForSkill[A_Index]
-					this._WeaponSetForKey[Key] := WeaponSet
-					this._WeaponSetKeys[WeaponSet].Push(Key)
+					this._SkillInfo[A_Index] := {Key: Key, Set: WeaponSetForSkill[A_Index]}
 					; Make each skill a hotkey so we can track the current skill.
-					Hotkeys[Key] := HotkeyFunc
+					Hotkeys[Key] := ObjBindMethod(this, "_HotkeyActivated", A_Index)
 				}
 			}
 			Diablo2.AssignMultiple(Hotkeys)
 		}
 
-		; Get the current skill (represented by its hotkey).
+		; Get the current skill number.
 		;
-		; Returns: The current skill key
+		; Returns: The current skill number, or "" if none is set
 		Get() {
 			return this._Skills[this._WeaponSet]
 		}
 
-		; Activate the skill assigned to the specific key.
+		; Activate a skill by number.
 		;
 		; Parameters:
-		; Key
-		;     The skill hotkey
-		Activate(Key) {
-			PreferredWeaponSet := this._WeaponSetForKey[Key]
+		; Skill
+		;     The skill number
+		Activate(Skill) {
+			if (Skill == "") {
+				return
+			}
+			SkillInfo := this._SkillInfo[Skill]
+			if (SkillInfo == "") {
+				Diablo2._Throw("Invalid skill " . Skill)
+			}
+			PreferredWeaponSet := SkillInfo.Set
 			ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != this._WeaponSet)
 			; Activating any skill hotkey cancels any previous key waiting for swap to be re-enabled.
-			this._SwapWaitingKey := ""
+			this._SwapWaitingSkill := 0
 
 			if (ShouldSwapWeaponSet) {
 				; If the skill requested needs to swap weapons but swapping is currently disabled, set the
 				; skill to be activated after a timeout.
 				if (this._SwapDisabled) {
-					this._SwapWaitingKey := Key
-					Diablo2._Throw(Format("Swapping disabled; will activate '{}' when ready" , Key), false)
+					this._SwapWaitingSkill := Skill
+					Diablo2._Throw(Format("Swapping disabled; will activate skill {} when ready", Skill), false)
 				}
 				; Temporarily disable swapping so that the user cannot immediately cause a swap back to the
 				; other weapon set, which tends to de-synchronize the macros and the game.
@@ -899,19 +903,19 @@ class Diablo2 {
 				this._WeaponSet := PreferredWeaponSet
 			}
 
-			if (this._Skills[this._WeaponSet] != Key) {
+			if (this._Skills[this._WeaponSet] != Skill) {
 				if (ShouldSwapWeaponSet) {
 					; If we just switched weapons, we need to sleep very slightly
 					; while the game actually swaps weapons.
 					Sleep, 70
 				}
-				this._Log(Format("Switching to skill on '{}'", Key))
-				this._Skills[this._WeaponSet] := Key
+				this._Log(Format("Switching to skill {}", Skill))
+				this._Skills[this._WeaponSet] := Skill
 			}
 			; The skill key shouldn't need to be sent if we're already on it. However, sending it actually
 			; helps in cases where the macros and the game are out-of-sync, and the game is on the wrong
 			; skill.
-			Diablo2.Send(Diablo2.HotkeySyntaxToSendSyntax(Key))
+			Diablo2.Send(Diablo2.HotkeySyntaxToSendSyntax(SkillInfo.Key))
 		}
 
 		; Block the user from swapping weapons.
@@ -929,15 +933,15 @@ class Diablo2 {
 		_EnableSwap() {
 			this._SwapDisabled := false
 			this._Log("Swapping enabled")
-			if (this._SwapWaitingKey) {
-				this._Log(Format("Activating '{}' which required swap", this._SwapWaitingKey))
-				this.Activate(this._SwapWaitingKey)
+			if (this._SwapWaitingSkill) {
+				this._Log(Format("Activating skill {} which required swap", this._SwapWaitingSkill))
+				this.Activate(this._SwapWaitingSkill)
 			}
 		}
 
-		; Activate the skill represented by the assigned hotkey.
-		g_HotkeyActivated() {
-			this.Activate(A_ThisHotkey)
+		; Activate a skill hotkey, catching exceptions.
+		g_HotkeyActivated(Skill) {
+			this.Activate(Skill)
 		}
 
 		; Perform a one-off skill.
@@ -947,12 +951,12 @@ class Diablo2 {
 		; work with or without it.
 		;
 		; Parameters:
-		; Key
-		;     The skill hotkey
+		; Skill
+		;     The skill number
 		; RightClick
 		;     Whether to right-click or left-click (default is right)
 		;
-		gOneOff(Key, RightClick := true) {
+		gOneOff(Skill, RightClick := true) {
 			ThisHotkey := A_ThisHotkey
 			; There are times when it isn't necessary to save the state of LButton, but it's really
 			; useful, for example, to keep moving after performing a Teleport. It's useful enough that
@@ -960,7 +964,7 @@ class Diablo2 {
 			LBRestore := new Diablo2._LButtonRestore()
 			OldSkill := this.Get()
 			OldWeaponSet := this._WeaponSet
-			this.Activate(Key)
+			this.Activate(Skill)
 			; If we had to swap weapons to use the one-off skill, we need to wait a bit. These sleeps are
 			; the only way it works reliably.
 			HadToSwap := this._WeaponSet != OldWeaponSet
