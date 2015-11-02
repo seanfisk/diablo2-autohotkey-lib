@@ -947,8 +947,10 @@ class Diablo2 {
 		; Parameters:
 		; Key
 		;     The skill hotkey
+		; RightClick
+		;     Whether to right-click or left-click (default is right)
 		;
-		gOneOff(Key) {
+		gOneOff(Key, RightClick := true) {
 			ThisHotkey := A_ThisHotkey
 			; There are times when it isn't necessary to save the state of LButton, but it's really
 			; useful, for example, to keep moving after performing a Teleport. It's useful enough that
@@ -963,11 +965,16 @@ class Diablo2 {
 			if (HadToSwap) {
 				Sleep, 600
 			}
-			; Some skills (e.g., Teleport) have trouble when LButton is held.
-			Diablo2.Send("{RButton down}{LButton up}")
+			if (RightClick) {
+				; Some skills (e.g., Teleport) have trouble when LButton is held.
+				Diablo2.Send("{RButton down}{LButton up}")
+			}
+			else {
+				Diablo2.Send("{LButton down}")
+			}
 			; Wait for the hotkey to be physically released (default).
 			KeyWait, %ThisHotkey%
-			Diablo2.Send("{RButton up}")
+			Diablo2.Send(Format("{{}{}Button up{}}", RightClick ? "R" : "L"))
 			LBRestore := "" ; Restore the LButton state
 			if (HadToSwap) {
 				Sleep, 600
