@@ -847,6 +847,7 @@ class Diablo2 {
 		; Current skills, indexed by weapon set then by button
 		_CurrentSkills := [["", ""], ["", ""]]
 		_ButtonLetters := ["L", "R"]
+		_ValidButtonWeaponSetValues := {"": "", 1: "", 2: ""}
 
 		__New(PartialSkillInfo) {
 			this._SwapKey := Diablo2.GetControl("Swap Weapons", true)
@@ -858,8 +859,9 @@ class Diablo2 {
 					PartialInfo := PartialSkillInfo[A_Index]
 					Name := PartialInfo.HasKey("Name") ? PartialInfo.Name : ("Skill " . A_Index)
 					; Set button; default is RButton (button 2)
-					Button := PartialInfo.HasKey("Button") ? PartialInfo.Button : 2
-					this._SkillInfo[A_Index] := {Name: Name, Key: Key, Button: Button, Set: PartialInfo.Set}
+					Button := this._ValidateButton(PartialInfo.HasKey("Button") ? PartialInfo.Button : 2)
+					Set := this._ValidateWeaponSet(PartialInfo.Set)
+					this._SkillInfo[A_Index] := {Name: Name, Key: Key, Button: Button, Set: Set}
 					this._SkillNumForName[Name] := A_Index
 					; Make each skill a hotkey so we can track the current skill.
 					Diablo2.Assign(Key, ObjBindMethod(this, "_HotkeyActivated", A_Index))
@@ -877,6 +879,7 @@ class Diablo2 {
 		;
 		; Returns: The current skill number, or "" if none is set
 		GetCurrentSkill(Button) {
+			this._ValidateButton(Button)
 			return this._CurrentSkills[this._CurrentWeaponSet][Button]
 		}
 
@@ -1005,6 +1008,23 @@ class Diablo2 {
 		; Reset skills to swap.
 		_ResetSwap() {
 			this._SwapWaitingSkills := ["", ""]
+		}
+
+		_Validate(ValueType, Value) {
+			if (!this._ValidButtonWeaponSetValues.HasKey(Value)) {
+				Diablo2._Throw(Format("{} value must be 1, 2, or """"; {} was given", ValueType, Value))
+			}
+			return Value
+		}
+
+		; Ensure a button value is valid.
+		_ValidateButton(Value) {
+			return this._Validate("Button", Value)
+		}
+
+		; Ensure a weapon set value is valid.
+		_ValidateWeaponSet(Value) {
+			return this._Validate("Weapon set", Value)
 		}
 
 		; Activate a skill hotkey, catching exceptions.
