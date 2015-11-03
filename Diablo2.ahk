@@ -892,7 +892,7 @@ class Diablo2 {
 			if (Num == "") {
 				return
 			}
-			SkillInfo := this._GetInfo(Num)
+			SkillInfo := this.GetInfo(Num)
 			PreferredWeaponSet := SkillInfo.Set
 			Button := SkillInfo.Button
 			ShouldSwapWeaponSet := (PreferredWeaponSet != "" and PreferredWeaponSet != this._CurrentWeaponSet)
@@ -964,12 +964,22 @@ class Diablo2 {
 		;     Skill number
 		;
 		; Returns: the skill info
-		_GetInfo(Num) {
+		GetInfo(Num) {
 			Info := this._SkillInfo[Num]
 			if (Info == "") {
 				Diablo2._Throw("Invalid skill " . Num)
 			}
+			Info.Num := Num
 			return Info
+		}
+
+		; Get information for a skill by name.
+		;
+		; Parameters:
+		; Name
+		;     Name of the skill
+		GetInfoByName(Name) {
+			return this.GetInfo(this._GetNumForName(Name))
 		}
 
 		; Get a corresponding button name for a number.
@@ -1043,7 +1053,7 @@ class Diablo2 {
 		;     Skill number
 		gOneOff(Num) {
 			ThisHotkey := A_ThisHotkey
-			Button := this._GetInfo(Num).Button
+			Button := this.GetInfo(Num).Button
 			; There are times when it isn't necessary to save the state of LButton, but it's really
 			; useful, for example, to keep moving after performing a Teleport. It's useful enough that
 			; it's included as the default behavior.
@@ -1082,7 +1092,7 @@ class Diablo2 {
 		MakeOneOff(Names) {
 			for _, Name in Names {
 				Num := this._GetNumForName(Name)
-				Info := this._GetInfo(Num)
+				Info := this.GetInfo(Num)
 				Diablo2.Assign(Info.Key, {Function: "Skills.OneOff", Args: [Num]})
 			}
 		}
