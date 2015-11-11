@@ -908,9 +908,7 @@ class Diablo2 {
 				; other weapon set, which tends to de-synchronize the macros and the game.
 				this._DisableSwap()
 				; Swap to the other weapon set.
-				this._Log("Swapping to weapon set " . PreferredWeaponSet)
-				Diablo2.Send(this._SwapKey)
-				this._CurrentWeaponSet := PreferredWeaponSet
+				this.gSwapWeapons()
 			}
 			else {
 				; Activating any skill hotkey on the current weapon set cancels any previous key waiting for
@@ -1042,6 +1040,14 @@ class Diablo2 {
 			this.Activate(Num)
 		}
 
+		; Deliberately swap weapons in a macro-aware fashion.
+		gSwapWeapons() {
+			Set := this._CurrentWeaponSet == 1 ? 2 : 1
+			this._Log("Swapping to weapon set " . Set)
+			Diablo2.Send(this._SwapKey)
+			this._CurrentWeaponSet := Set
+		}
+
 		; Perform a one-off skill.
 		;
 		; This is done by activating the skill, right-clicking, and then activating the old skill. For
@@ -1082,6 +1088,15 @@ class Diablo2 {
 				Sleep, 600
 			}
 			this.Activate(OldSkill)
+		}
+
+		; Perform a one-off skill by name.
+		;
+		; Parameters:
+		; Name
+		;     Name of the skill
+		gOneOffByName(Name) {
+			this.gOneOff(this._GetNumForName(Name))
 		}
 
 		; Override skills' keys to make them one-off skills.
