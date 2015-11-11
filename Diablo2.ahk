@@ -1256,8 +1256,8 @@ class Diablo2 {
 
 	class _FillPotionFeature extends Diablo2._EnabledFeature {
 		; Defaults
-		_Fullscreen := true
-		_LesserFirst := true
+		_Windowed := false
+		_LesserFirst := false
 		_FullscreenPotionsPerScreenshot := 3
 
 		_Potions := {}
@@ -1270,7 +1270,7 @@ class Diablo2 {
 				; Don't save the return value; we just want to check that these keys are set.
 				Diablo2.GetControl(Function)
 			}
-			for _, Key in ["Fullscreen", "LesserFirst", "FullscreenPotionsPerScreenshot"] {
+			for _, Key in ["Windowed", "LesserFirst", "FullscreenPotionsPerScreenshot"] {
 				if Config.HasKey(Key) {
 					this["_" . Key] := Config[Key]
 				}
@@ -1279,7 +1279,7 @@ class Diablo2 {
 			; Variation defaults are recommend; they were determined emperically
 			this._Variation := Config.HasKey("Variation")
 				? Config.Variation
-				: (this._Fullscreen ? 50 : 120)
+				: (this._Windowed ? 120 : 50)
 			; Prepare potion structures
 			for _, Type_ in ["Healing", "Mana"] {
 				this._Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
@@ -1298,7 +1298,7 @@ class Diablo2 {
 				}
 			}
 
-			if (this._Fullscreen) {
+			if (!this._Windowed) {
 				; Start GDI+ for full screen
 				this._GdipToken := Gdip_Startup()
 				if (!this._GdipToken) {
@@ -1343,7 +1343,7 @@ class Diablo2 {
 			this._Log("Running bitmap generation script")
 			ScriptPath := Diablo2.AutoHotkeyLibDir . "\GenerateBitmaps.ps1"
 			LogPath := A_WorkingDir . "\GenerateBitmaps.log"
-			WindowType := this._Fullscreen ? "Fullscreen" : "Windowed"
+			WindowType := this._Windowed ? "Windowed" : "Fullscreen"
 			; Don't use -File: https://connect.microsoft.com/PowerShell/feedback/details/750653/powershell-exe-doesn-t-return-correct-exit-codes-when-using-the-file-option
 			;
 			; The goal is to capture stdout and stderr. RunWait internally uses Wscript.Shell.Run, which
@@ -1416,7 +1416,7 @@ class Diablo2 {
 				}
 			}
 			; Cache needle bitmaps
-			if (this._Fullscreen) {
+			if (!this._Windowed) {
 				for Type_, Sizes in BitmapPaths {
 					for Size, Path in Sizes {
 						this._NeedleBitmaps[Type_, Size] := Diablo2.SafeCreateBitmapFromFile(Path)
@@ -1424,7 +1424,7 @@ class Diablo2 {
 				}
 			}
 			; Assign function
-			this._Function := ObjBindMethod(this, this._Fullscreen ? "_FullscreenBegin" : "_Windowed")
+			this._Function := ObjBindMethod(this, this._Windowed ? "_WindowedProcess" : "_FullscreenBegin")
 		}
 
 		; Return the potion image path for a specified type and size.
@@ -1439,7 +1439,7 @@ class Diablo2 {
 		_ImagePath(Type_, Size) {
 			return Format("{}\Images\{}\{}\{}.png"
 				, A_WorkingDir
-				, this._Fullscreen ? "Fullscreen" : "Windowed"
+				, this._Windowed ? "Windowed" : "Fullscreen"
 				, Type_, Size)
 		}
 
@@ -1466,7 +1466,7 @@ class Diablo2 {
 
 		; Perform starting tasks for a FillPotion run.
 		_Begin() {
-			this._Log(Format("Starting {} run", this._Fullscreen ? "fullscreen" : "windowed"))
+			this._Log(Format("Starting {} run", this._Windowed ? "windowed" : "fullscreen"))
 			Diablo2.ClearScreen()
 			Diablo2.OpenInventory()
 			Diablo2.ShowBelt()
@@ -1489,7 +1489,7 @@ class Diablo2 {
 		}
 
 		; Fill the belt with potions in windowed mode.
-		_Windowed() {
+		_WindowedProcess() {
 			this._Begin()
 			for Type_, Sizes in this._Potions {
 				LastPotion := {X: -1, Y: -1}
