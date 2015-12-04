@@ -30,7 +30,7 @@ Diablo2.Init("Controls.json"
 		, Voice: {}
 		, Skills: "Skills.json"
 		, MassItem: {}
-		, FillPotion: {Fullscreen: true}
+		, FillPotion: {}
 		; Enable Steam feature; Shift-Tab for the overlay is the default for Steam and for these macros.
 		, Steam: {BrowserTabUrls: GetTabUrls()}})
 
