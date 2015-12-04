@@ -1684,7 +1684,7 @@ PotionSizeLoop:
 
 	class _SteamFeature extends Diablo2._EnabledFeature {
 		; Default overlay key for Steam
-		_OverlayKey := "^{Tab}"
+		_OverlayKey := "+{Tab}"
 		_BrowserTabUrls := ["http://blizzard.com/diablo2/"]
 
 		__New(Config) {

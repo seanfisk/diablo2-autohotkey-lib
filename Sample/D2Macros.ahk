@@ -31,8 +31,8 @@ Diablo2.Init("Controls.json"
 		, Skills: "Skills.json"
 		, MassItem: {}
 		, FillPotion: {Fullscreen: true}
-		; Enable Steam feature; Ctrl-Tab for the overlay is the default for Steam and for these macros.
-		, Steam: {OverlayKey: "^{Tab}", BrowserTabUrls: GetTabUrls()}})
+		; Enable Steam feature; Shift-Tab for the overlay is the default for Steam and for these macros.
+		, Steam: {BrowserTabUrls: GetTabUrls()}})
 
 ; Ctrl+Alt+a to auto-configure controls.
 ; '^' is Control, '!' is Alt, and 'a' is the a key.
@@ -51,8 +51,8 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 		, "7": "MassItem.SelectEnd"
 		, "8": "MassItem.Drop"
 		, "9": "MassItem.MoveSingleCellItems"
-		; Control + Middle mouse button toggles the Steam overlay
-		, "^MButton": "Steam.OverlayToggle"
+		; Shift-Tab toggles the Steam overlay
+		, "+Tab": "Steam.OverlayToggle"
 		; Open tabs in the Steam overlay web browser.
 		, "^!w": "Steam.BrowserOpenTabs"}
 	; Means activate in the game only.
