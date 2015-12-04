@@ -6,9 +6,9 @@
 
 [CmdletBinding()]
 Param(
-	[Parameter(Mandatory=$true, Position=1)]
+	[Parameter(Mandatory=$true)]
 	[String]$ScreenshotPath,
-	[Parameter(Mandatory=$true, Position=2)]
+	[Parameter(Mandatory=$true)]
 	[ValidateSet("Windowed", "Fullscreen")]
 	[String]$WindowType
 )
