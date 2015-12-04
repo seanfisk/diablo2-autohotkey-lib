@@ -52,7 +52,7 @@ Diablo2.AssignMultiple({"^!a": "Controls.AutoAssign"
 		, "8": "MassItem.Drop"
 		, "9": "MassItem.MoveSingleCellItems"
 		; Control + Middle mouse button toggles the Steam overlay
-		, "^MButton": "Steam.OverlayToggle",
+		, "^MButton": "Steam.OverlayToggle"
 		; Open tabs in the Steam overlay web browser.
 		, "^!w": "Steam.BrowserOpenTabs"}
 	; Means activate in the game only.
