@@ -39,7 +39,7 @@ try {
 }
 catch
 {
-	throw "Could create bitmap from '$ScreenshotAbspath'. Ensure the image exists."
+	throw "Could not create bitmap from '$ScreenshotAbspath'. Ensure the image exists."
 }
 
 $RequiredSize = New-Object System.Drawing.Size(800, 600)
