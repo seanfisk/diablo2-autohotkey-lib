@@ -1258,6 +1258,7 @@ class Diablo2 {
 		; Defaults
 		_Windowed := false
 		_LesserFirst := false
+		_PotionTypes := ["Healing", "Mana", "Rejuvenation"]
 		_FullscreenPotionsPerScreenshot := 3
 
 		_Potions := {}
@@ -1270,7 +1271,7 @@ class Diablo2 {
 				; Don't save the return value; we just want to check that these keys are set.
 				Diablo2.GetControl(Function)
 			}
-			for _, Key in ["Windowed", "LesserFirst", "FullscreenPotionsPerScreenshot"] {
+			for _, Key in ["Windowed", "LesserFirst", "PotionTypes", "FullscreenPotionsPerScreenshot"] {
 				if Config.HasKey(Key) {
 					this["_" . Key] := Config[Key]
 				}
@@ -1285,9 +1286,16 @@ class Diablo2 {
 				this._Potions[Type_] := ["Minor", "Light", "Regular", "Greater", "Super"]
 			}
 			this._Potions.Rejuvenation := ["Regular", "Full"]
+			; Check validity of PotionTypes config value
+			for _, Type_ in this._PotionTypes {
+				if (!this._Potions.HasKey(Type_)) {
+					Diablo2._Throw("Invalid potion type: " . Type_)
+				}
+			}
 			; Reverse preference if necessary
 			if (!this._LesserFirst) {
-				for Type_, Sizes in this._Potions {
+				for _, Type_ in this._PotionTypes {
+					Sizes := this._Potions[Type_]
 					; Reverse the array
 					; Hints here: http://www.autohotkey.com/board/topic/45876-ahk-l-arrays/
 					NewSizes := []
@@ -1404,8 +1412,9 @@ class Diablo2 {
 		; Check for and initialize bitmaps.
 		_InitBitmaps() {
 			BitmapPaths := {}
-			for Type_, Sizes in this._Potions {
-				for _, Size in Sizes {
+			for _1, Type_ in this._PotionTypes {
+				Sizes := this._Potions[Type_]
+				for _2, Size in Sizes {
 					Path := this._ImagePath(Type_, Size)
 					if (!FileExist(Path)) {
 						this._HasBitmaps := false
@@ -1491,10 +1500,11 @@ class Diablo2 {
 		; Fill the belt with potions in windowed mode.
 		_WindowedProcess() {
 			this._Begin()
-			for Type_, Sizes in this._Potions {
+			for _1, Type_ in this._PotionTypes {
+				Sizes := this._Potions[Type_]
 				LastPotion := {X: -1, Y: -1}
 WindowedSizeLoop:
-				for _, Size in Sizes {
+				for _2, Size in Sizes {
 					NeedlePath := this._ImagePath(Type_, Size)
 					Loop {
 						try {
@@ -1533,7 +1543,7 @@ WindowedSizeLoop:
 		_FullscreenBegin() {
 			this._Begin()
 			; Initialize structures
-			for Type_ in this._Potions {
+			for _, Type_ in this._PotionTypes {
 				this["_FullscreenState", Type_] := {SizeIndex: 1, Finished: false, PotionsClicked: []}
 			}
 			Sleep, 100 ; Wait for the inventory to appear
@@ -1562,7 +1572,8 @@ WindowedSizeLoop:
 				; Assume we are finished for now; invalidate later if we are not.
 				Finished := true
 
-				for Type_, Sizes in this._Potions {
+				for _1, Type_ in this._PotionTypes {
+					Sizes := this._Potions[Type_]
 					if (this._FullscreenState[Type_].Finished) {
 						; We have already finished finding potions of this type.
 						continue
@@ -1591,13 +1602,13 @@ PotionSizeLoop:
 
 						; Collect all the potions we found into an array.
 						PotionsFound := []
-						for _3, CoordsString in StrSplit(CoordsListString, "`n") {
+						for _2, CoordsString in StrSplit(CoordsListString, "`n") {
 							Coords := StrSplit(CoordsString, "`,")
 							PotionFound := {X: Coords[1], Y: Coords[2]}
 							this._LogWithSize(Type_, Size, Format("Found at {1},{2}", PotionFound.X, PotionFound.Y))
 							; If any of the potions found were clicked before, the belt is already full of this type
 							; and we are finished with it.
-							for _4, PotionClicked in this._FullscreenState[Type_].PotionsClicked {
+							for _3, PotionClicked in this._FullscreenState[Type_].PotionsClicked {
 								if (PotionFound.X == PotionClicked.X and PotionFound.Y == PotionClicked.Y) {
 									this._FullscreenState[Type_].Finished := true
 									this._LogWithType(Type_, "Finished for run due to full belt")
